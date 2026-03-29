@@ -17,8 +17,11 @@ WORKDIR /app
 # Copy everything
 COPY . .
 
-# Install all dependencies from root (monorepo)
-RUN pnpm install --frozen-lockfile=false
+# Delete the old lock file so pnpm regenerates it fresh
+RUN rm -f pnpm-lock.yaml
+
+# Install all dependencies
+RUN pnpm install --no-frozen-lockfile
 
 # Build backend
 RUN pnpm --filter @workspace/api-server run build
