@@ -1,5 +1,6 @@
 FROM node:20-slim
 
+# Install system tools
 RUN apt-get update && apt-get install -y \
     texlive-latex-base \
     texlive-latex-extra \
@@ -8,14 +9,23 @@ RUN apt-get update && apt-get install -y \
     pandoc \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm
+# Install pnpm
+RUN npm install -g pnpm@9
 
 WORKDIR /app
+
+# Copy everything
 COPY . .
 
-RUN pnpm install
+# Install all dependencies from root (monorepo)
+RUN pnpm install --frozen-lockfile=false
+
+# Build backend
 RUN pnpm --filter @workspace/api-server run build
+
+# Build frontend
 RUN pnpm --filter @workspace/resume-ai run build
 
 EXPOSE 8080
+
 CMD ["node", "--enable-source-maps", "api-server/dist/index.mjs"]
