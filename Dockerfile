@@ -1,0 +1,21 @@
+FROM node:20-slim
+
+RUN apt-get update && apt-get install -y \
+    texlive-latex-base \
+    texlive-latex-extra \
+    texlive-fonts-recommended \
+    texlive-fonts-extra \
+    pandoc \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm
+
+WORKDIR /app
+COPY . .
+
+RUN pnpm install
+RUN pnpm --filter @workspace/api-server run build
+RUN pnpm --filter @workspace/resume-ai run build
+
+EXPOSE 8080
+CMD ["node", "--enable-source-maps", "api-server/dist/index.mjs"]
