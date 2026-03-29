@@ -1,0 +1,7 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "node --enable-source-maps api-server/dist/index.mjs"
+healthcheckPath = "/api/health"
+restartPolicyType = "on_failure"
