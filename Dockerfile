@@ -30,15 +30,3 @@ RUN pnpm --filter @workspace/resume-ai run build
 EXPOSE 8080
 
 CMD ["node", "--enable-source-maps", "api-server/dist/index.mjs"]
-```
-
-**Steps:**
-1. Go to GitHub → click `Dockerfile`
-2. Click pencil icon to edit
-3. Select all → delete everything
-4. Paste the above
-5. Click **Commit changes**
-
-Once Railway finishes building, visit:
-```
-https://resumify-ai-production.up.railway.app/api/debug
