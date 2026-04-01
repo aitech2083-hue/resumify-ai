@@ -12,13 +12,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API routes first
 app.use("/api", router);
 
-// Serve frontend static files — no existsSync, always register
 app.use(express.static("/app/frontend/dist/public"));
 
-// All other routes serve the React app
 app.get("*", (_req, res) => {
   res.sendFile("/app/frontend/dist/public/index.html");
 });
