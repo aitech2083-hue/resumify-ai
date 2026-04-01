@@ -14,7 +14,6 @@ router.get("/health", (_req, res) => {
   res.json(data);
 });
 
-// Debug — find frontend files
 router.get("/debug", (_req, res) => {
   const result: Record<string, any> = {};
   ["/app", "/app/frontend", "/app/frontend/dist", "/app/frontend/dist/public"].forEach(p => {
@@ -24,8 +23,3 @@ router.get("/debug", (_req, res) => {
 });
 
 export default router;
-```
-
-Commit → wait for deploy → visit:
-```
-https://resumify-ai-production.up.railway.app/api/debug
