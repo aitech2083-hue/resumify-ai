@@ -27,6 +27,29 @@ const initialScratchData: ScratchData = {
   certifications: ""
 };
 
+// -- Additional Experience Interface --
+interface AdditionalExp {
+  company: string;
+  role: string;
+  from: string;
+  to: string;
+  responsibilities: string;
+}
+
+const initialAdditionalExp: AdditionalExp = {
+  company: "", role: "", from: "", to: "", responsibilities: ""
+};
+
+function formatAdditionalExp(exp: AdditionalExp): string {
+  if (!exp.company && !exp.role) return "";
+  const parts: string[] = [];
+  if (exp.company) parts.push(`Company: ${exp.company}`);
+  if (exp.role) parts.push(`Role: ${exp.role}`);
+  if (exp.from || exp.to) parts.push(`Duration: ${exp.from || "?"} - ${exp.to || "Present"}`);
+  if (exp.responsibilities) parts.push(`Responsibilities:\n${exp.responsibilities}`);
+  return parts.join("\n");
+}
+
 export default function Home() {
   // -- App State --
   const [mode, setMode] = useState<Mode>("upload");
@@ -35,8 +58,11 @@ export default function Home() {
   // -- Input State --
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [linkedinFile, setLinkedinFile] = useState<File | null>(null);
-  const [extraUploadNotes, setExtraUploadNotes] = useState("");
-  const [extraLinkedinNotes, setExtraLinkedinNotes] = useState("");
+
+  // Structured additional experience (replaces plain textareas)
+  const [extraUploadExp, setExtraUploadExp] = useState<AdditionalExp>(initialAdditionalExp);
+  const [extraLinkedinExp, setExtraLinkedinExp] = useState<AdditionalExp>(initialAdditionalExp);
+
   const [scratchData, setScratchData] = useState<ScratchData>(initialScratchData);
   const [extraScratchNotes, setExtraScratchNotes] = useState("");
   
@@ -77,8 +103,8 @@ export default function Home() {
     
     try {
       let extraNotes = "";
-      if (mode === "upload") extraNotes = extraUploadNotes;
-      if (mode === "linkedin") extraNotes = extraLinkedinNotes;
+      if (mode === "upload") extraNotes = formatAdditionalExp(extraUploadExp);
+      if (mode === "linkedin") extraNotes = formatAdditionalExp(extraLinkedinExp);
       if (mode === "scratch") extraNotes = extraScratchNotes;
 
       const data = await generateMut.mutateAsync({
@@ -179,13 +205,11 @@ export default function Home() {
     setPreviewBlobs({});
     setPreviewLoading({});
 
-    // Seed editable latex from result
     const latexMap: Record<number, string> = {};
     result.results.forEach((r, i) => { latexMap[i] = r.latex || ""; });
     setEditableLatex(latexMap);
     setResumeViewMode("preview");
 
-    // Compile each JD in parallel
     result.results.forEach((r, i) => {
       if (!r.latex) return;
       setPreviewLoading(prev => ({ ...prev, [i]: true }));
@@ -253,7 +277,6 @@ export default function Home() {
     }
   };
 
-  // Close download menu when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
@@ -342,14 +365,51 @@ export default function Home() {
                       sublabel="PDF or TXT format"
                       icon={<FileCode2 className="w-6 h-6 text-muted-foreground" />}
                     />
+
+                    {/* Structured Additional Experience */}
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground">Additional / Recent Experience</label>
-                      <textarea 
-                        value={extraUploadNotes}
-                        onChange={(e) => setExtraUploadNotes(e.target.value)}
-                        placeholder="Currently at Acme Corp as Sr. Analyst (Jan 2024-Present)..."
-                        className="w-full bg-surface border border-border rounded-xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-y"
-                      />
+                      <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+                        Additional / Recent Experience
+                      </label>
+                      <p className="text-xs text-muted-foreground">Have a new job not on your resume? Add it here — it will appear first.</p>
+                      <div className="p-3 bg-surface border border-border rounded-xl space-y-2">
+                        <input
+                          type="text"
+                          placeholder="Company name"
+                          value={extraUploadExp.company}
+                          onChange={e => setExtraUploadExp(s => ({ ...s, company: e.target.value }))}
+                          className="scratch-input"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Your role / position"
+                          value={extraUploadExp.role}
+                          onChange={e => setExtraUploadExp(s => ({ ...s, role: e.target.value }))}
+                          className="scratch-input"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="From (e.g. Jan 2024)"
+                            value={extraUploadExp.from}
+                            onChange={e => setExtraUploadExp(s => ({ ...s, from: e.target.value }))}
+                            className="scratch-input flex-1"
+                          />
+                          <input
+                            type="text"
+                            placeholder="To (e.g. Present)"
+                            value={extraUploadExp.to}
+                            onChange={e => setExtraUploadExp(s => ({ ...s, to: e.target.value }))}
+                            className="scratch-input flex-1"
+                          />
+                        </div>
+                        <textarea
+                          placeholder={"Responsibilities & achievements (bullet points recommended)\n• Led a team of 5 engineers...\n• Increased revenue by 30%..."}
+                          value={extraUploadExp.responsibilities}
+                          onChange={e => setExtraUploadExp(s => ({ ...s, responsibilities: e.target.value }))}
+                          className="scratch-textarea min-h-[90px]"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -369,14 +429,51 @@ export default function Home() {
                       label="Drop LinkedIn PDF"
                       sublabel="Exported profile PDF"
                     />
+
+                    {/* Structured Additional Experience */}
                     <div className="space-y-2">
-                      <label className="text-xs font-medium text-muted-foreground">Additional Notes</label>
-                      <textarea 
-                        value={extraLinkedinNotes}
-                        onChange={(e) => setExtraLinkedinNotes(e.target.value)}
-                        placeholder="Any recent experience not on LinkedIn..."
-                        className="w-full bg-surface border border-border rounded-xl p-4 text-sm min-h-[100px] focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-y"
-                      />
+                      <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+                        Additional / Recent Experience
+                      </label>
+                      <p className="text-xs text-muted-foreground">Have a new job not on your LinkedIn? Add it here — it will appear first.</p>
+                      <div className="p-3 bg-surface border border-border rounded-xl space-y-2">
+                        <input
+                          type="text"
+                          placeholder="Company name"
+                          value={extraLinkedinExp.company}
+                          onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))}
+                          className="scratch-input"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Your role / position"
+                          value={extraLinkedinExp.role}
+                          onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))}
+                          className="scratch-input"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="From (e.g. Jan 2024)"
+                            value={extraLinkedinExp.from}
+                            onChange={e => setExtraLinkedinExp(s => ({ ...s, from: e.target.value }))}
+                            className="scratch-input flex-1"
+                          />
+                          <input
+                            type="text"
+                            placeholder="To (e.g. Present)"
+                            value={extraLinkedinExp.to}
+                            onChange={e => setExtraLinkedinExp(s => ({ ...s, to: e.target.value }))}
+                            className="scratch-input flex-1"
+                          />
+                        </div>
+                        <textarea
+                          placeholder={"Responsibilities & achievements (bullet points recommended)\n• Led a team of 5 engineers...\n• Increased revenue by 30%..."}
+                          value={extraLinkedinExp.responsibilities}
+                          onChange={e => setExtraLinkedinExp(s => ({ ...s, responsibilities: e.target.value }))}
+                          className="scratch-textarea min-h-[90px]"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -724,9 +821,7 @@ export default function Home() {
                     {/* --- RESUME --- */}
                     {activeFeatureTab === 'resume' && (
                       <div className="h-full flex flex-col gap-0" style={{ minHeight: 0 }}>
-                        {/* Toolbar */}
                         <div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0 flex-wrap">
-                          {/* Preview / Edit toggle */}
                           <div className="flex items-center bg-surface border border-border rounded-xl p-1 gap-1">
                             <button
                               onClick={() => setResumeViewMode("preview")}
@@ -752,11 +847,8 @@ export default function Home() {
                             </button>
                           </div>
 
-                          {/* Action buttons */}
                           <div className="flex items-center gap-2 flex-wrap">
-                            {/* Split download button */}
                             <div ref={downloadMenuRef} className="relative flex">
-                              {/* Primary: Download PDF */}
                               <button
                                 onClick={() => {
                                   const latex = editableLatex[activeJdTab] || result.results[activeJdTab].latex;
@@ -774,7 +866,6 @@ export default function Home() {
                                   : <><Download className="w-4 h-4" /> Download PDF</>
                                 }
                               </button>
-                              {/* Chevron to open menu */}
                               <button
                                 onClick={() => setShowDownloadMenu(v => !v)}
                                 disabled={downloadingPdf || downloadingDocx}
@@ -786,7 +877,6 @@ export default function Home() {
                                   : <ChevronDown className="w-4 h-4" />
                                 }
                               </button>
-                              {/* Dropdown menu */}
                               {showDownloadMenu && (
                                 <div className="absolute right-0 top-full mt-1.5 z-50 bg-surface border border-border rounded-xl shadow-xl overflow-hidden min-w-[180px]">
                                   <button
@@ -821,7 +911,6 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Content area */}
                         <div className="flex-1 overflow-hidden rounded-xl border border-border" style={{ minHeight: 0 }}>
                           {resumeViewMode === "preview" ? (
                             previewLoading[activeJdTab] ? (
@@ -859,24 +948,13 @@ export default function Home() {
                     {activeFeatureTab === 'ats' && (
                       <div className="max-w-4xl mx-auto space-y-6">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <AtsCard 
-                            title="Original Resume" 
-                            data={result.results[activeJdTab].atsOriginal} 
-                            type="neutral"
-                          />
-                          <AtsCard 
-                            title="Tailored Version" 
-                            data={result.results[activeJdTab].atsTailored} 
-                            type="success"
-                          />
+                          <AtsCard title="Original Resume" data={result.results[activeJdTab].atsOriginal} type="neutral" />
+                          <AtsCard title="Tailored Version" data={result.results[activeJdTab].atsTailored} type="success" />
                         </div>
-                        
                         <div className="bg-surface border border-border rounded-xl p-6 flex items-center justify-between shadow-lg">
                           <div>
                             <h3 className="text-lg font-display font-semibold text-foreground">Optimization Result</h3>
-                            <p className="text-muted-foreground text-sm mt-1">
-                              Your resume was rewritten to hit target keywords and use the XYZ impact formula.
-                            </p>
+                            <p className="text-muted-foreground text-sm mt-1">Your resume was rewritten to hit target keywords and use the XYZ impact formula.</p>
                           </div>
                           <div className="text-right">
                             <div className="text-4xl font-mono font-bold text-primary">
@@ -927,12 +1005,9 @@ export default function Home() {
                             <CopyButton text={result.linkedin.headline} minimal />
                           </div>
                           <div className="p-6">
-                            <p className="text-lg font-medium text-foreground leading-snug">
-                              {result.linkedin.headline}
-                            </p>
+                            <p className="text-lg font-medium text-foreground leading-snug">{result.linkedin.headline}</p>
                           </div>
                         </div>
-                        
                         <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
                           <div className="bg-[#0a66c2]/10 border-b border-border px-6 py-3 flex justify-between items-center">
                             <h3 className="font-semibold text-[#0a66c2] flex items-center gap-2">
@@ -941,9 +1016,7 @@ export default function Home() {
                             <CopyButton text={result.linkedin.about} minimal />
                           </div>
                           <div className="p-6">
-                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">
-                              {result.linkedin.about}
-                            </p>
+                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.linkedin.about}</p>
                           </div>
                         </div>
                       </div>
@@ -952,7 +1025,6 @@ export default function Home() {
                     {/* --- REFINE AI --- */}
                     {activeFeatureTab === 'refine' && (
                       <div className="max-w-3xl mx-auto h-full flex flex-col" style={{ minHeight: 400 }}>
-                        {/* Chat messages */}
                         <div className="flex-1 overflow-y-auto space-y-4 pb-4 custom-scrollbar">
                           {!(refineMessages[activeJdTab]?.length) && (
                             <div className="text-center py-12">
@@ -964,26 +1036,12 @@ export default function Home() {
                                 Type a command to improve your resume. The AI will update it instantly and you can re-download.
                               </p>
                               <div className="flex flex-wrap justify-center gap-2 mt-5">
-                                {[
-                                  "Increase ATS score",
-                                  "Make bullets more quantified",
-                                  "Shorten to fit 1 page",
-                                  "Add more technical keywords",
-                                  "Strengthen the summary",
-                                  "Fix grammar and tone",
-                                ].map(s => (
-                                  <button
-                                    key={s}
-                                    onClick={() => setRefineInput(s)}
-                                    className="px-3 py-1.5 bg-surface border border-border rounded-full text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors"
-                                  >
-                                    {s}
-                                  </button>
+                                {["Increase ATS score","Make bullets more quantified","Shorten to fit 1 page","Add more technical keywords","Strengthen the summary","Fix grammar and tone"].map(s => (
+                                  <button key={s} onClick={() => setRefineInput(s)} className="px-3 py-1.5 bg-surface border border-border rounded-full text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors">{s}</button>
                                 ))}
                               </div>
                             </div>
                           )}
-
                           {(refineMessages[activeJdTab] || []).map((msg, i) => (
                             <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
                               {msg.role === "assistant" && (
@@ -991,17 +1049,11 @@ export default function Home() {
                                   <Bot className="w-4 h-4 text-primary" />
                                 </div>
                               )}
-                              <div className={cn(
-                                "max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed",
-                                msg.role === "user"
-                                  ? "bg-primary text-primary-foreground rounded-tr-sm"
-                                  : "bg-surface border border-border text-foreground rounded-tl-sm"
-                              )}>
+                              <div className={cn("max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed", msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-surface border border-border text-foreground rounded-tl-sm")}>
                                 {msg.content}
                               </div>
                             </div>
                           ))}
-
                           {refineLoading[activeJdTab] && (
                             <div className="flex gap-3 justify-start">
                               <div className="w-8 h-8 rounded-full bg-primary/15 flex-shrink-0 flex items-center justify-center mt-1">
@@ -1015,8 +1067,6 @@ export default function Home() {
                           )}
                           <div ref={refineBottomRef} />
                         </div>
-
-                        {/* Input area */}
                         <div className="flex-shrink-0 flex gap-2 pt-4 border-t border-border">
                           <input
                             type="text"
@@ -1032,10 +1082,7 @@ export default function Home() {
                             disabled={!refineInput.trim() || refineLoading[activeJdTab]}
                             className="px-4 py-3 bg-primary rounded-xl text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm"
                           >
-                            {refineLoading[activeJdTab]
-                              ? <Loader2 className="w-4 h-4 animate-spin" />
-                              : <Send className="w-4 h-4" />
-                            }
+                            {refineLoading[activeJdTab] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
@@ -1050,7 +1097,6 @@ export default function Home() {
         </div>
       </main>
       
-      {/* Required Scratch Mode Global CSS specific tweaks */}
       <style dangerouslySetInnerHTML={{__html: `
         .scratch-input {
           @apply w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all;
@@ -1069,13 +1115,7 @@ export default function Home() {
 
 function CopyButton({ text, label = "Copy", minimal = false }: { text: string, label?: string, minimal?: boolean }) {
   const [copied, setCopied] = useState(false);
-  
-  const handleCopy = () => {
-    copyToClipboard(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  
+  const handleCopy = () => { copyToClipboard(text); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   if (minimal) {
     return (
       <button onClick={handleCopy} className="p-1.5 text-muted-foreground hover:text-primary transition-colors">
@@ -1083,12 +1123,8 @@ function CopyButton({ text, label = "Copy", minimal = false }: { text: string, l
       </button>
     );
   }
-
   return (
-    <button 
-      onClick={handleCopy}
-      className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-foreground"
-    >
+    <button onClick={handleCopy} className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-foreground">
       {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
       {copied ? "Copied!" : label}
     </button>
@@ -1099,33 +1135,19 @@ function AtsCard({ title, data, type }: { title: string, data: AtsScore, type: '
   const score = data?.score || 0;
   let colorClass = "text-warning";
   let barClass = "bg-warning";
-  
   if (score >= 80) { colorClass = "text-success"; barClass = "bg-success"; }
   else if (score <= 50) { colorClass = "text-destructive"; barClass = "bg-destructive"; }
-
-  if (type === 'neutral') {
-    colorClass = "text-foreground";
-    barClass = "bg-muted-foreground";
-  }
-
+  if (type === 'neutral') { colorClass = "text-foreground"; barClass = "bg-muted-foreground"; }
   return (
     <div className="bg-surface border border-border rounded-xl p-6 flex flex-col">
       <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">{title}</h4>
-      
       <div className="flex items-end gap-2 mb-4">
         <span className={cn("text-6xl font-mono font-bold leading-none", colorClass)}>{score}</span>
         <span className="text-xl text-muted-foreground font-mono mb-1">/100</span>
       </div>
-      
       <div className="w-full h-2 bg-background rounded-full overflow-hidden mb-6">
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: `${score}%` }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className={cn("h-full rounded-full", barClass)}
-        />
+        <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }} transition={{ duration: 1, ease: "easeOut" }} className={cn("h-full rounded-full", barClass)} />
       </div>
-      
       <div className="flex-1 bg-background rounded-lg p-4 text-sm text-muted-foreground leading-relaxed">
         {data?.breakdown || "No breakdown provided."}
       </div>
