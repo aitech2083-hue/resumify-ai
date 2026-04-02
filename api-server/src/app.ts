@@ -16,7 +16,7 @@ app.use("/api", router);
 
 app.use(express.static("/app/frontend/dist/public"));
 
-app.get("*", (_req, res) => {
+app.get("/*", (_req, res) => {
   res.sendFile("/app/frontend/dist/public/index.html");
 });
 
