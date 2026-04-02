@@ -1,5 +1,7 @@
 FROM node:20-slim
 
+ARG CACHEBUST=2
+
 RUN apt-get update && apt-get install -y \
     texlive-latex-base \
     texlive-latex-extra \
@@ -25,3 +27,4 @@ RUN pnpm --filter @workspace/resume-ai run build
 EXPOSE 8080
 
 CMD ["node", "--enable-source-maps", "api-server/dist/index.mjs"]
+
