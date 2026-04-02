@@ -94,22 +94,30 @@ function buildScratchText(sd: ScratchData): string {
   return out.trim();
 }
 
+// FIX 1 & 3: additional experience is now passed separately and prominently labeled
 function makeContent(
   resumeText: string | null,
   resumeB64: string | null,
-  extra: string,
+  jdBlock: string,
+  additionalExperience?: string,
 ): ContentBlock[] {
   const parts: ContentBlock[] = [];
+
+  // Build the extra text block — additional experience comes FIRST and prominently
+  const additionalBlock = additionalExperience
+    ? `\n\n⚠️ MOST RECENT EXPERIENCE (HIGHEST PRIORITY — ADD THIS FIRST IN WORK EXPERIENCE SECTION):\n${additionalExperience}\n`
+    : "";
+
   if (resumeB64) {
     parts.push({
       type: "document",
       source: { type: "base64", media_type: "application/pdf", data: resumeB64 },
     });
-    parts.push({ type: "text", text: extra });
+    parts.push({ type: "text", text: `${additionalBlock}\n${jdBlock}` });
   } else {
     parts.push({
       type: "text",
-      text: `RESUME / PROFILE:\n${resumeText}\n\n${extra}`,
+      text: `RESUME / PROFILE:\n${resumeText}${additionalBlock}\n\n${jdBlock}`,
     });
   }
   return parts;
@@ -152,6 +160,7 @@ async function generateResumeAndATS(
   resumeB64: string | null,
   isLinkedIn: boolean,
   isScratch: boolean,
+  additionalExperience?: string,
 ): Promise<{
   latex: string;
   atsOriginal: AtsScore;
@@ -176,23 +185,44 @@ async function generateResumeAndATS(
       ? "The input is a LinkedIn PDF export. Extract experience, skills, education carefully from its non-standard formatting."
       : "Tailor the existing resume to the job description.";
 
+  // FIX 2 & 3: Improved system prompt with deep analysis instructions
+  // and explicit handling of additional experience
   const system = [
     "You are an elite resume writer, ATS expert, and LaTeX developer.",
+    "Take your time to carefully read and deeply understand both the resume and the job description before writing anything.",
     "",
     modeInstructions,
     "",
+    "━━━ STEP 1: HANDLE ADDITIONAL/RECENT EXPERIENCE FIRST ━━━",
+    "• If the candidate has provided ADDITIONAL or RECENT experience (marked with ⚠️ MOST RECENT EXPERIENCE), this is their LATEST role",
+    "• You MUST add this experience as the FIRST entry in the Work Experience section — before all other roles",
+    "• Do NOT ignore, skip, or bury this experience anywhere — it is their most current job and must be visible",
+    "• Incorporate the skills and responsibilities from this role into the Professional Summary and Skills sections too",
+    "",
+    "━━━ STEP 2: DEEPLY ANALYZE THE JOB DESCRIPTION ━━━",
+    "• Read the full JD carefully — understand what the company is actually looking for",
+    "• Extract ALL important keywords: hard skills, soft skills, tools, frameworks, methodologies",
+    "• Identify the top 10 most critical keywords the employer needs",
+    "• Plan to include each important keyword at least 4-6 times naturally across the resume",
+    "• Understand the seniority level, industry, and company culture from the JD before writing",
+    "",
+    "━━━ STEP 3: SKILL MATCHING RULES ━━━",
+    "• If candidate has a similar skill to what JD requires — replace with the JD keyword (e.g. Tableau → Power BI)",
+    "• If a JD skill is entirely missing from the resume — weave it in 4-6 times across summary, experience, skills",
+    "• Be ethical — only add skills that are contextually logical given the candidate's actual background",
+    "• Never add skills that make no sense with their experience — do not make up experience they do not have",
+    "",
     "━━━ TAILORING RULES ━━━",
-    "• Replace similar skills with exact JD keywords (e.g. Tableau→Power BI if JD requires it)",
-    "• If a JD skill is entirely absent, weave it in 4-6 times across summary, experience, skills",
-    "• Only add skills that are contextually logical given the candidate's background",
-    '• XYZ formula: "Accomplished [X], measured by [Y], by doing [Z]"',
-    "• At least 5 quantified bullets",
-    "• Match ≥80% of JD keywords for ATS",
-    "• No pronouns (I/me/my), no buzzwords, every bullet starts with a strong action verb",
+    "• Match ≥80% of JD keywords to maximize ATS score",
+    '• XYZ formula for all bullets: "Accomplished [X], measured by [Y], by doing [Z]"',
+    "• At least 5 quantified bullets with real metrics — avoid vague statements",
+    "• Every bullet starts with a strong action verb",
+    "• No pronouns (I/me/my), no buzzwords, no clichés",
+    "• Focus on achievements and impact, not just duties",
     "• Body content: 400-500 words, fits 1 page",
     "",
     "━━━ PRESERVE ORIGINAL FORMAT ━━━",
-    String.raw`• CRITICAL: Preserve all original currency symbols EXACTLY as they appear in the source resume. If the resume uses ₹ (Indian Rupee), use \rupee in LaTeX (from tfrupee package) — do NOT convert to $ or any other currency. If it uses €, use \texteuro. If it uses £, use \textsterling. Keep ALL original currency symbols.`,
+    String.raw`• CRITICAL: Preserve all original currency symbols EXACTLY. If resume uses ₹ use \rupee in LaTeX (from tfrupee package) — do NOT convert to $. If it uses €, use \texteuro. If £, use \textsterling.`,
     "• Preserve original number formats EXACTLY (e.g. lakhs/crores — do NOT convert to millions/billions)",
     "• Preserve original date formats and location names",
     "• Do NOT localize or Americanize content unless the JD specifically requires it",
@@ -223,7 +253,7 @@ async function generateResumeAndATS(
   ].join("\n");
 
   const jdBlock = `TARGET ROLE: ${jd.title || "Position"} at ${jd.company || "Company"}\n\nJOB DESCRIPTION:\n${jd.text}`;
-  const content = makeContent(resumeText, resumeB64, jdBlock);
+  const content = makeContent(resumeText, resumeB64, jdBlock, additionalExperience);
   const raw = await callClaude(system, content, 8192);
 
   const latex = (extractTag(raw, "LATEX") || "").replace(/```latex|```/g, "").trim();
@@ -243,10 +273,12 @@ async function generateEmailAndCover(
   resumeB64: string | null,
   tone: string,
   isLinkedIn: boolean,
+  additionalExperience?: string,
 ): Promise<{ email: string; coverLetter: string }> {
   const system = `You are an expert career coach and professional writer.
 Generate a cold-outreach EMAIL and a formal COVER LETTER for the candidate.
 ${isLinkedIn ? "Input is a LinkedIn PDF export." : ""}
+${additionalExperience ? "The candidate has recent experience — prioritize this in your writing." : ""}
 
 ━━━ EMAIL (tone: ${tone}) ━━━
 • Under 200 words — body only, no subject line
@@ -274,7 +306,7 @@ ${isLinkedIn ? "Input is a LinkedIn PDF export." : ""}
 </COVER>`;
 
   const jdBlock = `ROLE: ${jd.title || "Position"} at ${jd.company || "Company"}\n\nJOB DESCRIPTION:\n${jd.text}`;
-  const content = makeContent(resumeText, resumeB64, jdBlock);
+  const content = makeContent(resumeText, resumeB64, jdBlock, additionalExperience);
   const raw = await callClaude(system, content, 8192);
 
   return {
@@ -288,10 +320,12 @@ async function generateLinkedIn(
   resumeText: string | null,
   resumeB64: string | null,
   isLinkedIn: boolean,
+  additionalExperience?: string,
 ): Promise<LinkedInContent> {
   const system = `You are a LinkedIn profile optimisation expert.
 Rewrite the candidate's LinkedIn Headline and About section.
 ${isLinkedIn ? "Input is a LinkedIn PDF — use existing profile as the base." : ""}
+${additionalExperience ? "The candidate has recent additional experience — incorporate this prominently." : ""}
 
 ━━━ HEADLINE ━━━
 • Max 220 characters
@@ -321,6 +355,7 @@ ${isLinkedIn ? "Input is a LinkedIn PDF — use existing profile as the base." :
     resumeText,
     resumeB64,
     jdBlock || "Analyse the profile and write the best LinkedIn headline and About section.",
+    additionalExperience,
   );
   const raw = await callClaude(system, content, 8192);
 
@@ -338,10 +373,11 @@ async function processJD(
   tone: string,
   isLinkedIn: boolean,
   isScratch: boolean,
+  additionalExperience?: string,
 ): Promise<JobResult> {
   const [rr, cr] = await Promise.all([
-    generateResumeAndATS(jd, resumeText, resumeB64, isLinkedIn, isScratch),
-    generateEmailAndCover(jd, resumeText, resumeB64, tone, isLinkedIn),
+    generateResumeAndATS(jd, resumeText, resumeB64, isLinkedIn, isScratch, additionalExperience),
+    generateEmailAndCover(jd, resumeText, resumeB64, tone, isLinkedIn, additionalExperience),
   ]);
   return {
     jdIndex: idx,
@@ -378,6 +414,10 @@ router.post(
     let resumeText: string | null = null;
     let resumeB64: string | null = null;
 
+    // FIX 1 & 3: additional experience is now tracked separately
+    // so it can be passed explicitly to each function and placed correctly
+    let additionalExperience: string | undefined = undefined;
+
     if (isScratch) {
       let sd: ScratchData = {};
       try {
@@ -392,14 +432,16 @@ router.post(
           .json({ error: "Fill in at least your name and one experience block." });
         return;
       }
-      if (extra) resumeText += `\n\nADDITIONAL NOTES:\n${extra}`;
+      if (extra) additionalExperience = extra;
     } else if (req.file) {
       if (req.file.mimetype === "application/pdf") {
         resumeB64 = req.file.buffer.toString("base64");
       } else {
         resumeText = req.file.buffer.toString("utf-8");
       }
-      if (extra) resumeText = (resumeText || "") + `\n\nCURRENT / ADDITIONAL EXPERIENCE:\n${extra}`;
+      // FIX: store extra separately instead of appending to resumeText
+      // This ensures it gets passed as MOST RECENT EXPERIENCE to the AI
+      if (extra) additionalExperience = extra;
     } else {
       res.status(400).json({ error: "Upload a resume or use Build from Scratch." });
       return;
@@ -409,10 +451,10 @@ router.post(
       const [jdResults, linkedin] = await Promise.all([
         Promise.all(
           jds.map((jd, i) =>
-            processJD(jd, i, resumeText, resumeB64, tone, isLinkedIn, isScratch),
+            processJD(jd, i, resumeText, resumeB64, tone, isLinkedIn, isScratch, additionalExperience),
           ),
         ),
-        generateLinkedIn(jds[0] || null, resumeText, resumeB64, isLinkedIn),
+        generateLinkedIn(jds[0] || null, resumeText, resumeB64, isLinkedIn, additionalExperience),
       ]);
       res.json({ results: jdResults, linkedin });
     } catch (err) {
