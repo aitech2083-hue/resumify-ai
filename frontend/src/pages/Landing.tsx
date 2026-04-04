@@ -1,0 +1,540 @@
+import { useEffect, useRef, useState } from "react";
+import { Link } from "wouter";
+import { motion, useInView } from "framer-motion";
+import {
+  Upload, Wand2, Download, Zap, Target, FileText,
+  Mail, Linkedin, BarChart3, Bot, ArrowRight, Check,
+  Star, ChevronRight, Sparkles, Shield, Clock
+} from "lucide-react";
+
+// ── Animation helpers ──────────────────────────────────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
+};
+
+const stagger = {
+  visible: { transition: { staggerChildren: 0.12 } },
+};
+
+function AnimateIn({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: "-60px" });
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={inView ? "visible" : "hidden"}
+      variants={stagger}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function FadeItem({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <motion.div variants={fadeUp} className={className}>
+      {children}
+    </motion.div>
+  );
+}
+
+// ── Navbar ─────────────────────────────────────────────────────────────────
+function Navbar() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handler);
+    return () => window.removeEventListener("scroll", handler);
+  }, []);
+
+  return (
+    <motion.nav
+      initial={{ opacity: 0, y: -16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? "bg-[#070c18]/90 backdrop-blur-xl border-b border-white/5"
+          : "bg-transparent"
+      }`}
+    >
+      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 group">
+          <div className="w-8 h-8 rounded-lg bg-[#f0a020] flex items-center justify-center shadow-lg shadow-[#f0a020]/30">
+            <Sparkles className="w-4 h-4 text-[#070c18]" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white font-display">
+            Rez<span className="text-[#f0a020]">AI</span>
+          </span>
+        </Link>
+
+        {/* Nav links */}
+        <div className="hidden md:flex items-center gap-8">
+          {["Features", "How it works", "Testimonials"].map((item) => (
+            <a
+              key={item}
+              href={`#${item.toLowerCase().replace(/ /g, "-")}`}
+              className="text-sm text-white/60 hover:text-white transition-colors duration-200"
+            >
+              {item}
+            </a>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <Link
+          href="/app"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f0a020] text-[#070c18] font-semibold text-sm hover:bg-[#f0a020]/90 transition-all duration-200 shadow-lg shadow-[#f0a020]/20 hover:shadow-[#f0a020]/40 hover:-translate-y-0.5"
+        >
+          Try Free
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    </motion.nav>
+  );
+}
+
+// ── Hero ───────────────────────────────────────────────────────────────────
+function Hero() {
+  return (
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+      {/* Background glow orbs */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#f0a020]/5 blur-[120px]" />
+        <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] rounded-full bg-[#f0a020]/8 blur-[80px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-blue-500/5 blur-[100px]" />
+        {/* Grid */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(#f0a020 1px, transparent 1px), linear-gradient(90deg, #f0a020 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
+        />
+      </div>
+
+      <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
+        {/* Badge */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1, duration: 0.5 }}
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#f0a020]/30 bg-[#f0a020]/10 text-[#f0a020] text-sm font-medium mb-8"
+        >
+          <Zap className="w-3.5 h-3.5" />
+          AI-powered resume tailoring in seconds
+        </motion.div>
+
+        {/* Headline */}
+        <motion.h1
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.7 }}
+          className="text-5xl md:text-7xl font-bold tracking-tight text-white font-display leading-[1.05] mb-6"
+        >
+          Get more interviews.
+          <br />
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#F7C353] via-[#f0a020] to-[#D49E37]">
+            Stop rewriting
+          </span>
+          <br />
+          your resume.
+        </motion.h1>
+
+        {/* Subheadline */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.6 }}
+          className="text-lg md:text-xl text-white/55 max-w-2xl mx-auto mb-10 leading-relaxed"
+        >
+          Upload your resume, paste a job description, and RezAI instantly generates a
+          perfectly tailored resume, cover letter, cold email, and LinkedIn profile — optimised
+          for ATS and the human eye.
+        </motion.p>
+
+        {/* CTAs */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+        >
+          <Link
+            href="/app"
+            className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#f0a020] text-[#070c18] font-bold text-base hover:bg-[#f0a020]/90 transition-all duration-200 shadow-xl shadow-[#f0a020]/25 hover:shadow-[#f0a020]/45 hover:-translate-y-1"
+          >
+            Build my resume — it's free
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <a
+            href="#how-it-works"
+            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl border border-white/10 text-white/70 font-medium text-base hover:border-white/25 hover:text-white transition-all duration-200"
+          >
+            See how it works
+          </a>
+        </motion.div>
+
+        {/* Social proof */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7, duration: 0.6 }}
+          className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-white/40"
+        >
+          {[
+            { icon: <Check className="w-3.5 h-3.5 text-[#f0a020]" />, label: "No credit card required" },
+            { icon: <Check className="w-3.5 h-3.5 text-[#f0a020]" />, label: "PDF & DOCX export" },
+            { icon: <Check className="w-3.5 h-3.5 text-[#f0a020]" />, label: "ATS score analysis" },
+          ].map(({ icon, label }) => (
+            <div key={label} className="flex items-center gap-2">
+              {icon}
+              <span>{label}</span>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+// ── How it works ───────────────────────────────────────────────────────────
+const steps = [
+  {
+    number: "01",
+    icon: <Upload className="w-6 h-6" />,
+    title: "Upload your resume",
+    description:
+      "Drop your existing resume (PDF), paste your LinkedIn export, or build from scratch using our guided form.",
+  },
+  {
+    number: "02",
+    icon: <Target className="w-6 h-6" />,
+    title: "Paste the job description",
+    description:
+      "Add up to 3 job descriptions at once. RezAI deeply analyses every keyword, requirement, and signal the employer cares about.",
+  },
+  {
+    number: "03",
+    icon: <Download className="w-6 h-6" />,
+    title: "Download & apply",
+    description:
+      "Instantly get a tailored resume, cover letter, cold email, and LinkedIn profile — ready to apply. Download as PDF or Word.",
+  },
+];
+
+function HowItWorks() {
+  return (
+    <section id="how-it-works" className="py-28 px-6">
+      <div className="max-w-6xl mx-auto">
+        <AnimateIn className="text-center mb-16">
+          <FadeItem>
+            <p className="text-[#f0a020] font-semibold text-sm uppercase tracking-widest mb-3">
+              How it works
+            </p>
+          </FadeItem>
+          <FadeItem>
+            <h2 className="text-4xl md:text-5xl font-bold text-white font-display tracking-tight">
+              From resume to offer in{" "}
+              <span className="text-gradient-gold">three steps</span>
+            </h2>
+          </FadeItem>
+        </AnimateIn>
+
+        <AnimateIn className="grid md:grid-cols-3 gap-8 relative">
+          {/* Connector line */}
+          <div className="hidden md:block absolute top-12 left-[calc(16.67%+1rem)] right-[calc(16.67%+1rem)] h-px bg-gradient-to-r from-transparent via-[#f0a020]/30 to-transparent" />
+
+          {steps.map((step) => (
+            <FadeItem key={step.number}>
+              <div className="relative p-8 rounded-2xl border border-white/6 bg-white/[0.02] hover:border-[#f0a020]/25 hover:bg-white/[0.04] transition-all duration-300 group">
+                {/* Step number */}
+                <div className="absolute -top-4 left-8 text-[#f0a020]/20 font-bold text-6xl font-display leading-none select-none group-hover:text-[#f0a020]/30 transition-colors">
+                  {step.number}
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-[#f0a020]/10 border border-[#f0a020]/20 flex items-center justify-center text-[#f0a020] mb-5 mt-4 group-hover:bg-[#f0a020]/20 transition-colors">
+                  {step.icon}
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2 font-display">
+                  {step.title}
+                </h3>
+                <p className="text-white/50 text-sm leading-relaxed">{step.description}</p>
+              </div>
+            </FadeItem>
+          ))}
+        </AnimateIn>
+      </div>
+    </section>
+  );
+}
+
+// ── Features ───────────────────────────────────────────────────────────────
+const features = [
+  {
+    icon: <FileText className="w-5 h-5" />,
+    title: "ATS-optimised resumes",
+    description:
+      "Every resume is scored before and after tailoring. RezAI targets 80%+ keyword match to beat applicant tracking systems every time.",
+  },
+  {
+    icon: <Wand2 className="w-5 h-5" />,
+    title: "One-click cover letters",
+    description:
+      "Get a 300-word cover letter that opens with your strongest achievement and directly addresses what the employer needs.",
+  },
+  {
+    icon: <Mail className="w-5 h-5" />,
+    title: "Cold outreach emails",
+    description:
+      "A punchy, under-200-word cold email with a clear hook, matched metrics, and a strong call to action — ready to send.",
+  },
+  {
+    icon: <Linkedin className="w-5 h-5" />,
+    title: "LinkedIn headline & About",
+    description:
+      "Rewrite your LinkedIn profile with keyword-rich headline and a compelling About section that gets you found by recruiters.",
+  },
+  {
+    icon: <Bot className="w-5 h-5" />,
+    title: "AI refinement chat",
+    description:
+      "Not quite right? Chat with RezAI to fine-tune any section. Ask it to change tone, add keywords, or shorten bullets.",
+  },
+  {
+    icon: <BarChart3 className="w-5 h-5" />,
+    title: "Multi-role in one go",
+    description:
+      "Apply to up to 3 different roles simultaneously. Each output is independently tailored — no generic copy-paste.",
+  },
+];
+
+function Features() {
+  return (
+    <section id="features" className="py-28 px-6">
+      <div className="max-w-6xl mx-auto">
+        <AnimateIn className="text-center mb-16">
+          <FadeItem>
+            <p className="text-[#f0a020] font-semibold text-sm uppercase tracking-widest mb-3">
+              Features
+            </p>
+          </FadeItem>
+          <FadeItem>
+            <h2 className="text-4xl md:text-5xl font-bold text-white font-display tracking-tight">
+              Everything you need to{" "}
+              <span className="text-gradient-gold">land the role</span>
+            </h2>
+          </FadeItem>
+          <FadeItem>
+            <p className="text-white/50 mt-4 text-lg max-w-xl mx-auto">
+              One tool replaces five. Resume writer, ATS checker, cover letter generator, LinkedIn
+              optimiser, and outreach coach — all in one.
+            </p>
+          </FadeItem>
+        </AnimateIn>
+
+        <AnimateIn className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {features.map((f) => (
+            <FadeItem key={f.title}>
+              <div className="p-6 rounded-2xl border border-white/6 bg-white/[0.02] hover:border-[#f0a020]/25 hover:bg-white/[0.04] transition-all duration-300 group h-full">
+                <div className="w-10 h-10 rounded-lg bg-[#f0a020]/10 border border-[#f0a020]/20 flex items-center justify-center text-[#f0a020] mb-4 group-hover:bg-[#f0a020]/20 transition-colors">
+                  {f.icon}
+                </div>
+                <h3 className="text-base font-semibold text-white mb-2 font-display">
+                  {f.title}
+                </h3>
+                <p className="text-white/45 text-sm leading-relaxed">{f.description}</p>
+              </div>
+            </FadeItem>
+          ))}
+        </AnimateIn>
+      </div>
+    </section>
+  );
+}
+
+// ── Testimonials ───────────────────────────────────────────────────────────
+const testimonials = [
+  {
+    stars: 5,
+    quote:
+      "I'd been applying for 3 months with zero callbacks. After using RezAI to tailor my resume for a senior PM role, I got an interview the same week. The ATS score went from 41 to 89.",
+    name: "Priya Mehta",
+    role: "Senior Product Manager",
+    company: "Hired at a Series B startup",
+  },
+  {
+    stars: 5,
+    quote:
+      "The cold email template it generated was better than anything I could have written. I sent 12 emails, got 4 responses — that's a 33% reply rate. Insane.",
+    name: "James Okoro",
+    role: "Software Engineer",
+    company: "Transitioned from agency to FAANG",
+  },
+  {
+    stars: 5,
+    quote:
+      "I was switching from finance to tech and had no idea how to position myself. RezAI rewrote my entire story — resume, LinkedIn, cover letter — in one session. Got 3 offers.",
+    name: "Sarah Lin",
+    role: "Data Analyst",
+    company: "Career switcher, now at a fintech unicorn",
+  },
+];
+
+function Testimonials() {
+  return (
+    <section id="testimonials" className="py-28 px-6">
+      <div className="max-w-6xl mx-auto">
+        <AnimateIn className="text-center mb-16">
+          <FadeItem>
+            <p className="text-[#f0a020] font-semibold text-sm uppercase tracking-widest mb-3">
+              Testimonials
+            </p>
+          </FadeItem>
+          <FadeItem>
+            <h2 className="text-4xl md:text-5xl font-bold text-white font-display tracking-tight">
+              Real results from{" "}
+              <span className="text-gradient-gold">real job seekers</span>
+            </h2>
+          </FadeItem>
+        </AnimateIn>
+
+        <AnimateIn className="grid md:grid-cols-3 gap-6">
+          {testimonials.map((t) => (
+            <FadeItem key={t.name}>
+              <div className="p-7 rounded-2xl border border-white/8 bg-white/[0.03] hover:border-[#f0a020]/20 transition-all duration-300 flex flex-col h-full">
+                {/* Stars */}
+                <div className="flex gap-1 mb-5">
+                  {Array.from({ length: t.stars }).map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-[#f0a020] text-[#f0a020]" />
+                  ))}
+                </div>
+                {/* Quote */}
+                <p className="text-white/65 text-sm leading-relaxed flex-1 mb-6">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                {/* Author */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-[#f0a020]/20 flex items-center justify-center text-[#f0a020] font-bold text-sm font-display">
+                    {t.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">{t.name}</p>
+                    <p className="text-white/40 text-xs">{t.role}</p>
+                    <p className="text-[#f0a020]/70 text-xs">{t.company}</p>
+                  </div>
+                </div>
+              </div>
+            </FadeItem>
+          ))}
+        </AnimateIn>
+      </div>
+    </section>
+  );
+}
+
+// ── CTA Banner ─────────────────────────────────────────────────────────────
+function CTABanner() {
+  return (
+    <section className="py-24 px-6">
+      <div className="max-w-4xl mx-auto">
+        <AnimateIn>
+          <FadeItem>
+            <div className="relative rounded-3xl border border-[#f0a020]/20 bg-gradient-to-br from-[#f0a020]/8 via-transparent to-[#f0a020]/5 p-12 text-center overflow-hidden">
+              {/* Glow */}
+              <div className="absolute inset-0 rounded-3xl bg-[#f0a020]/5 blur-3xl pointer-events-none" />
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-2 mb-5">
+                  <Shield className="w-5 h-5 text-[#f0a020]" />
+                  <span className="text-[#f0a020] text-sm font-medium">Free to use — no signup required</span>
+                </div>
+                <h2 className="text-4xl md:text-5xl font-bold text-white font-display tracking-tight mb-4">
+                  Your next interview is{" "}
+                  <span className="text-gradient-gold">one resume away</span>
+                </h2>
+                <p className="text-white/50 text-lg mb-8 max-w-xl mx-auto">
+                  Stop sending generic applications. Let RezAI tailor every word to every role —
+                  in under 60 seconds.
+                </p>
+                <Link
+                  href="/app"
+                  className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#f0a020] text-[#070c18] font-bold text-base hover:bg-[#f0a020]/90 transition-all duration-200 shadow-xl shadow-[#f0a020]/30 hover:shadow-[#f0a020]/50 hover:-translate-y-1"
+                >
+                  Start for free
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <div className="mt-6 flex items-center justify-center gap-6 text-sm text-white/35">
+                  {[
+                    { icon: <Clock className="w-3.5 h-3.5" />, label: "Ready in 60 seconds" },
+                    { icon: <Check className="w-3.5 h-3.5 text-[#f0a020]" />, label: "PDF & Word export" },
+                    { icon: <Zap className="w-3.5 h-3.5" />, label: "Powered by Claude AI" },
+                  ].map(({ icon, label }) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span className="text-[#f0a020]/60">{icon}</span>
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </FadeItem>
+        </AnimateIn>
+      </div>
+    </section>
+  );
+}
+
+// ── Footer ─────────────────────────────────────────────────────────────────
+function Footer() {
+  return (
+    <footer className="border-t border-white/5 py-10 px-6">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Logo */}
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-[#f0a020] flex items-center justify-center">
+            <Sparkles className="w-3.5 h-3.5 text-[#070c18]" />
+          </div>
+          <span className="text-lg font-bold text-white font-display">
+            Rez<span className="text-[#f0a020]">AI</span>
+          </span>
+        </div>
+
+        <p className="text-white/30 text-sm text-center">
+          &copy; {new Date().getFullYear()} RezAI. Built with Claude AI.
+        </p>
+
+        <div className="flex items-center gap-6 text-sm text-white/40">
+          <Link href="/app" className="hover:text-[#f0a020] transition-colors">
+            Launch App
+          </Link>
+          <a
+            href="#features"
+            className="hover:text-white/70 transition-colors"
+          >
+            Features
+          </a>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+export default function Landing() {
+  return (
+    <div className="min-h-screen bg-[#070c18] text-white">
+      <Navbar />
+      <Hero />
+      <HowItWorks />
+      <Features />
+      <Testimonials />
+      <CTABanner />
+      <Footer />
+    </div>
+  );
+}
