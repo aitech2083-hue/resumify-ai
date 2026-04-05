@@ -947,6 +947,55 @@ export default function Home() {
                     {/* --- ATS SCORE --- */}
                     {activeFeatureTab === 'ats' && (
                       <div className="max-w-4xl mx-auto space-y-6">
+
+                        {/* Keyword Analysis */}
+                        {(result.results[activeJdTab].matched_keywords?.length > 0 || result.results[activeJdTab].missing_keywords?.length > 0) && (
+                          <div className="bg-surface border border-border rounded-xl p-6 shadow-sm space-y-5">
+                            <h3 className="text-lg font-display font-semibold text-foreground">Keyword Analysis</h3>
+
+                            {result.results[activeJdTab].matched_keywords?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-success mb-3">
+                                  Found in your resume
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {result.results[activeJdTab].matched_keywords.map((kw) => (
+                                    <span
+                                      key={kw}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      {kw}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {result.results[activeJdTab].missing_keywords?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-destructive mb-3">
+                                  Missing from your resume
+                                </p>
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                  {result.results[activeJdTab].missing_keywords.map((kw) => (
+                                    <span
+                                      key={kw}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20"
+                                    >
+                                      <X className="w-3 h-3" />
+                                      {kw}
+                                    </span>
+                                  ))}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  These keywords appear in the job description but not in your resume. Use <span className="text-primary font-medium">Refine AI</span> to add them.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <AtsCard title="Original Resume" data={result.results[activeJdTab].atsOriginal} type="neutral" />
                           <AtsCard title="Tailored Version" data={result.results[activeJdTab].atsTailored} type="success" />
