@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   Zap, Settings, Trash2, Plus, X,
   ChevronRight, Copy, Check, FileCode2,
   Briefcase, GraduationCap, LayoutTemplate,
@@ -19,15 +19,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PdfPreview } from "@/components/ui/PdfPreview";
 import { ResumeEditor } from "@/components/ui/ResumeEditor";
 
-// -- Refine quick-action chips --
-const REFINE_QUICK_CHIPS = [
-  "Add missing keywords",
-  "Improve ATS score",
-  "Shorten to 1 page",
-  "Strengthen summary",
-  "Fix weak verbs",
-  "Make bullets quantified",
-] as const;
+// -- RezAI Agent quick-action chips --
+const AGENT_CHIPS_ROW1 = ["Add missing keywords", "Strengthen summary", "Fix weak verbs", "Shorten to 1 page"] as const;
+const AGENT_CHIPS_ROW2 = ["What salary to ask?", "Am I a good fit?", "Interview questions", "Write follow-up email"] as const;
 
 // -- Initial States --
 const initialScratchData: ScratchData = {
@@ -64,20 +58,16 @@ export default function Home() {
   // -- App State --
   const [mode, setMode] = useState<Mode>("upload");
   const [tone, setTone] = useState<Tone>("formal");
-  
+
   // -- Input State --
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [linkedinFile, setLinkedinFile] = useState<File | null>(null);
-
-  // Structured additional experience (replaces plain textareas)
   const [extraUploadExp, setExtraUploadExp] = useState<AdditionalExp>(initialAdditionalExp);
   const [extraLinkedinExp, setExtraLinkedinExp] = useState<AdditionalExp>(initialAdditionalExp);
-
   const [scratchData, setScratchData] = useState<ScratchData>(initialScratchData);
   const [extraScratchNotes, setExtraScratchNotes] = useState("");
-  
   const [jds, setJds] = useState<JD[]>([{ id: uuidv4(), title: "", company: "", text: "" }]);
-  
+
   // -- Output State --
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [activeJdTab, setActiveJdTab] = useState<number>(0);
@@ -95,13 +85,22 @@ export default function Home() {
   const [previewBlobs, setPreviewBlobs] = useState<Record<number, Blob>>({});
   const [previewLoading, setPreviewLoading] = useState<Record<number, boolean>>({});
 
-  // -- Refine Chat State --
-  interface RefineMsg { role: "user" | "assistant"; content: string; }
-  const [refineMessages, setRefineMessages] = useState<Record<number, RefineMsg[]>>({});
-  const [refineInput, setRefineInput] = useState("");
-  const [refineLoading, setRefineLoading] = useState<Record<number, boolean>>({});
-  const [refineGreeted, setRefineGreeted] = useState<Record<number, boolean>>({});
-  const refineBottomRef = useRef<HTMLDivElement>(null);
+  // -- RezAI Agent Chat State --
+  interface AgentMessage {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    type?: "edit" | "answer";
+    action?: string | null;
+    timestamp: Date;
+  }
+  const [agentMessages, setAgentMessages] = useState<Record<number, AgentMessage[]>>({});
+  const [agentInput, setAgentInput] = useState("");
+  const [agentLoading, setAgentLoading] = useState<Record<number, boolean>>({});
+  const [agentGreeted, setAgentGreeted] = useState<Record<number, boolean>>({});
+  const [agentOpen, setAgentOpen] = useState(false);
+  const agentBottomRef = useRef<HTMLDivElement>(null);
+  const agentBubbleBottomRef = useRef<HTMLDivElement>(null);
 
   // -- Hooks --
   const generateMut = useGenerateResume();
@@ -111,7 +110,6 @@ export default function Home() {
   const handleGenerate = async () => {
     setErrorMsg(null);
     setResult(null);
-    
     try {
       let extraNotes = "";
       if (mode === "upload") extraNotes = formatAdditionalExp(extraUploadExp);
@@ -119,7 +117,7 @@ export default function Home() {
       if (mode === "scratch") extraNotes = extraScratchNotes;
 
       const data = await generateMut.mutateAsync({
-        mode, tone, jds, 
+        mode, tone, jds,
         extra: extraNotes,
         scratchData: mode === "scratch" ? scratchData : undefined,
         resumeFile, linkedinFile
@@ -128,15 +126,13 @@ export default function Home() {
       setResult(data);
       setActiveJdTab(0);
       setActiveFeatureTab("resume");
-      
-      // Save to history
+
       saveHistory({
         id: uuidv4(),
         date: new Date().toISOString(),
         jds: [...jds],
         response: data
       });
-      
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to generate materials. Please try again.");
     }
@@ -150,80 +146,34 @@ export default function Home() {
     setResumeViewMode("preview");
   };
 
-  // Auto-scroll refine chat to bottom
+  // Auto-scroll agent chat to bottom (tab view)
   useEffect(() => {
-    refineBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [refineMessages, refineLoading]);
+    agentBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [agentMessages, agentLoading]);
 
-  // Inject greeting when Refine tab is first opened for each JD
+  // Auto-scroll agent chat to bottom (bubble)
   useEffect(() => {
-    if (activeFeatureTab !== "refine" || !result || refineGreeted[activeJdTab]) return;
+    agentBubbleBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [agentMessages, agentLoading, agentOpen]);
+
+  // Inject greeting when agent tab or bubble opens for a JD for the first time
+  useEffect(() => {
+    const agentVisible = activeFeatureTab === "agent" || agentOpen;
+    if (!agentVisible || !result || agentGreeted[activeJdTab]) return;
     const r = result.results[activeJdTab];
     if (!r) return;
     const greeting =
-      `Hi! I've reviewed your resume for ${r.company}. ` +
-      `Your ATS score improved from ${r.atsOriginal.score} to ${r.atsTailored.score}.\n\n` +
-      `Here's what I can help you with next:`;
-    setRefineMessages(prev => ({ ...prev, [activeJdTab]: [{ role: "assistant" as const, content: greeting }] }));
-    setRefineGreeted(prev => ({ ...prev, [activeJdTab]: true }));
+      `Hi! I'm RezAI Agent — your personal career coach.\n\n` +
+      `I've loaded your resume for ${r.jobTitle} at ${r.company}.\n` +
+      `ATS score: ${r.atsOriginal.score}/100 → ${r.atsTailored.score}/100 ✨\n\n` +
+      `I can edit your resume, check your job fit, help with interview prep, salary negotiation, and more. What would you like to do?`;
+    setAgentMessages(prev => ({
+      ...prev,
+      [activeJdTab]: [{ id: uuidv4(), role: "assistant" as const, content: greeting, type: "answer", timestamp: new Date() }]
+    }));
+    setAgentGreeted(prev => ({ ...prev, [activeJdTab]: true }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFeatureTab, activeJdTab]);
-
-  // Core send logic — used by handleRefine, quick chips, and Fix with AI
-  const sendRefineMessage = async (instruction: string, tab = activeJdTab) => {
-    const latex = editableLatex[tab] || result?.results[tab]?.latex || "";
-    if (!instruction || !latex || refineLoading[tab]) return;
-
-    const userMsg: RefineMsg = { role: "user", content: instruction };
-    setRefineMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), userMsg] }));
-    setRefineLoading(prev => ({ ...prev, [tab]: true }));
-
-    try {
-      const baseUrl = import.meta.env.BASE_URL || "/";
-      const jd = jds[tab];
-      const res = await fetch(`${baseUrl}api/resume/refine`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latex, instruction, jd }),
-      });
-      if (!res.ok) throw new Error("Refinement failed");
-      const data = await res.json();
-      const newLatex: string = data.latex;
-
-      setEditableLatex(prev => ({ ...prev, [tab]: newLatex }));
-      setPreviewLoading(prev => ({ ...prev, [tab]: true }));
-      compileLatexToBlob(newLatex).then(blob => {
-        if (blob) setPreviewBlobs(prev => ({ ...prev, [tab]: blob }));
-        setPreviewLoading(prev => ({ ...prev, [tab]: false }));
-      });
-
-      const assistantMsg: RefineMsg = {
-        role: "assistant",
-        content: data.message || "Done! Your resume has been updated. Switch to the Resume tab to see the changes.",
-      };
-      setRefineMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), assistantMsg] }));
-    } catch {
-      const errMsg: RefineMsg = { role: "assistant", content: "Something went wrong. Please try again." };
-      setRefineMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), errMsg] }));
-    } finally {
-      setRefineLoading(prev => ({ ...prev, [tab]: false }));
-    }
-  };
-
-  const handleRefine = async () => {
-    const instruction = refineInput.trim();
-    if (!instruction) return;
-    setRefineInput("");
-    await sendRefineMessage(instruction);
-  };
-
-  // Fix with AI — switches to Refine tab and auto-sends missing keywords message
-  const handleFixWithAI = (missingKeywords: string[]) => {
-    const instruction = `Add these missing keywords naturally into my resume: ${missingKeywords.join(", ")}`;
-    setActiveFeatureTab("refine");
-    // Short delay lets the greeting inject before the user message appears
-    setTimeout(() => sendRefineMessage(instruction), 80);
-  };
+  }, [activeFeatureTab, agentOpen, activeJdTab]);
 
   // -- Compile latex → Blob for preview --
   const compileLatexToBlob = useCallback(async (latex: string): Promise<Blob | null> => {
@@ -240,6 +190,98 @@ export default function Home() {
       return null;
     }
   }, []);
+
+  // -- Shared agent send function --
+  const sendAgentMessage = async (message: string, tab = activeJdTab) => {
+    if (!message.trim() || agentLoading[tab]) return;
+
+    const latex = editableLatex[tab] || result?.results[tab]?.latex || "";
+    const r = result?.results[tab];
+    const jd = jds[tab];
+    const history = (agentMessages[tab] || []).map(m => ({ role: m.role, content: m.content }));
+
+    const userMsg: AgentMessage = { id: uuidv4(), role: "user", content: message, timestamp: new Date() };
+    setAgentMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), userMsg] }));
+    setAgentLoading(prev => ({ ...prev, [tab]: true }));
+
+    try {
+      const baseUrl = import.meta.env.BASE_URL || "/";
+      const res = await fetch(`${baseUrl}api/resume/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latex,
+          message,
+          history,
+          jd,
+          atsOriginal: r?.atsOriginal,
+          atsTailored: r?.atsTailored,
+          matchedKeywords: r?.matched_keywords || [],
+          missingKeywords: r?.missing_keywords || [],
+          currentTab: activeFeatureTab,
+        }),
+      });
+      if (!res.ok) throw new Error("Agent request failed");
+      const data = await res.json();
+
+      // If the agent edited the resume, update latex + recompile
+      if (data.type === "edit" && data.latex) {
+        setEditableLatex(prev => ({ ...prev, [tab]: data.latex }));
+        setPreviewLoading(prev => ({ ...prev, [tab]: true }));
+        compileLatexToBlob(data.latex).then(blob => {
+          if (blob) setPreviewBlobs(prev => ({ ...prev, [tab]: blob }));
+          setPreviewLoading(prev => ({ ...prev, [tab]: false }));
+        });
+      }
+
+      // Handle action tags
+      if (data.action) {
+        if (data.action.startsWith("tab:")) {
+          setActiveFeatureTab(data.action.replace("tab:", ""));
+        } else if (data.action === "download:pdf") {
+          const l = data.latex || editableLatex[tab] || r?.latex || "";
+          if (l) downloadPdf(l);
+        } else if (data.action === "download:docx") {
+          const l = data.latex || editableLatex[tab] || r?.latex || "";
+          if (l) downloadDocx(l);
+        }
+      }
+
+      const agentMsg: AgentMessage = {
+        id: uuidv4(),
+        role: "assistant",
+        content: data.message || "Done! What else can I help you with?",
+        type: data.type,
+        action: data.action || null,
+        timestamp: new Date(),
+      };
+      setAgentMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), agentMsg] }));
+    } catch {
+      const errMsg: AgentMessage = {
+        id: uuidv4(), role: "assistant",
+        content: "Something went wrong. Please try again.",
+        timestamp: new Date(),
+      };
+      setAgentMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), errMsg] }));
+    } finally {
+      setAgentLoading(prev => ({ ...prev, [tab]: false }));
+    }
+  };
+
+  const handleAgentSend = async () => {
+    const msg = agentInput.trim();
+    if (!msg) return;
+    setAgentInput("");
+    await sendAgentMessage(msg);
+  };
+
+  // Fix with RezAI Agent — opens bubble + agent tab and auto-sends
+  const handleFixWithAgent = (missingKeywords: string[]) => {
+    const instruction = `Please add these missing keywords naturally into my resume: ${missingKeywords.join(", ")}`;
+    setAgentOpen(true);
+    setActiveFeatureTab("agent");
+    setTimeout(() => sendAgentMessage(instruction), 80);
+  };
 
   // Auto-compile all JDs when result arrives
   useEffect(() => {
@@ -279,9 +321,7 @@ export default function Home() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
+      a.href = url; a.download = filename; a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
       alert(e.message || "PDF download failed. Please try again.");
@@ -308,9 +348,7 @@ export default function Home() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
+      a.href = url; a.download = filename; a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
       alert(e.message || "Word download failed. Please try again.");
@@ -329,6 +367,92 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // -- Shared agent chat bubble renderer (used in tab + floating panel) --
+  const renderAgentChat = (opts: {
+    messages: AgentMessage[];
+    loading: boolean;
+    bottomRef: React.RefObject<HTMLDivElement>;
+    compact?: boolean;
+  }) => {
+    const { messages, loading, bottomRef, compact } = opts;
+    const noUserMsgsYet = !messages.some(m => m.role === "user");
+    return (
+      <div className="flex-1 overflow-y-auto space-y-3 py-3 custom-scrollbar">
+        {messages.map((msg, i) => (
+          <div key={msg.id} className={cn("flex gap-2.5", msg.role === "user" ? "justify-end" : "justify-start")}>
+            {msg.role === "assistant" && (
+              <div className="w-7 h-7 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center mt-0.5 border border-primary/30">
+                <Zap className="w-3.5 h-3.5 text-primary fill-current" />
+              </div>
+            )}
+            <div className={cn(
+              "rounded-2xl text-sm leading-relaxed whitespace-pre-wrap",
+              compact ? "max-w-[85%] px-3 py-2.5" : "max-w-[78%] px-4 py-3",
+              msg.role === "user"
+                ? "bg-primary text-primary-foreground rounded-tr-sm"
+                : "bg-[#0c1626] border border-[#1e304a] text-foreground/90 rounded-tl-sm"
+            )}>
+              {/* Edit badge */}
+              {msg.type === "edit" && (
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-success text-xs font-semibold mb-2">
+                  <Check className="w-3 h-3" /> Resume updated
+                </div>
+              )}
+              {msg.content}
+              {/* Action pill */}
+              {msg.action && msg.action.startsWith("tab:") && (
+                <button
+                  onClick={() => setActiveFeatureTab(msg.action!.replace("tab:", ""))}
+                  className="flex items-center gap-1 mt-2 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/25 text-primary text-xs font-medium hover:bg-primary/20 transition-colors"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                  View {msg.action.replace("tab:", "")} tab
+                </button>
+              )}
+              {/* Quick chips below first greeting */}
+              {msg.role === "assistant" && i === 0 && noUserMsgsYet && (
+                <div className="mt-3 pt-3 border-t border-[#1e304a]/60 space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {AGENT_CHIPS_ROW1.map(chip => (
+                      <button key={chip} onClick={() => sendAgentMessage(chip)}
+                        disabled={loading}
+                        className="px-2.5 py-1 bg-background border border-border rounded-full text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-40">
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {AGENT_CHIPS_ROW2.map(chip => (
+                      <button key={chip} onClick={() => sendAgentMessage(chip)}
+                        disabled={loading}
+                        className="px-2.5 py-1 bg-background border border-border rounded-full text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-40">
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {/* Typing indicator */}
+        {loading && (
+          <div className="flex gap-2.5 justify-start">
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center border border-primary/30">
+              <Zap className="w-3.5 h-3.5 text-primary fill-current" />
+            </div>
+            <div className="bg-[#0c1626] border border-[#1e304a] px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
+              {[0, 0.2, 0.4].map((delay, k) => (
+                <span key={k} className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${delay}s` }} />
+              ))}
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       {/* HEADER */}
@@ -342,7 +466,6 @@ export default function Home() {
             <p className="text-xs font-medium text-primary tracking-widest uppercase mt-1 opacity-80">v2 Engine</p>
           </div>
         </div>
-        
         <div className="flex items-center gap-4">
           <div className="px-3 py-1.5 rounded-full bg-surface border border-border flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <span className="relative flex h-2 w-2">
@@ -356,7 +479,7 @@ export default function Home() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 flex overflow-hidden">
-        
+
         {/* === LEFT PANEL (INPUTS) === */}
         <div className="w-full md:w-[480px] flex-shrink-0 flex flex-col border-r border-border bg-surface/30 z-10">
           <div className="p-5 border-b border-border bg-surface/50 backdrop-blur-sm">
@@ -365,7 +488,7 @@ export default function Home() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
-            
+
             {/* 1. Resume Mode */}
             <section className="space-y-3">
               <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">Base Profile Mode</label>
@@ -376,8 +499,8 @@ export default function Home() {
                     onClick={() => setMode(m)}
                     className={cn(
                       "flex-1 text-xs font-medium py-2 rounded-md transition-all duration-200 capitalize tracking-wide",
-                      mode === m 
-                        ? "bg-primary text-primary-foreground shadow-sm" 
+                      mode === m
+                        ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                     )}
                   >
@@ -389,7 +512,7 @@ export default function Home() {
 
             {/* Mode Content */}
             <AnimatePresence mode="wait">
-              <motion.section 
+              <motion.section
                 key={mode}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -399,7 +522,7 @@ export default function Home() {
               >
                 {mode === "upload" && (
                   <div className="space-y-4">
-                    <Dropzone 
+                    <Dropzone
                       accept={{ "application/pdf": [".pdf"], "text/plain": [".txt"] }}
                       selectedFile={resumeFile}
                       onFileSelect={setResumeFile}
@@ -407,50 +530,17 @@ export default function Home() {
                       sublabel="PDF or TXT format"
                       icon={<FileCode2 className="w-6 h-6 text-muted-foreground" />}
                     />
-
-                    {/* Structured Additional Experience */}
                     <div className="space-y-2">
-                      <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
-                        Additional / Recent Experience
-                      </label>
+                      <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">Additional / Recent Experience</label>
                       <p className="text-xs text-muted-foreground">Have a new job not on your resume? Add it here — it will appear first.</p>
                       <div className="p-3 bg-surface border border-border rounded-xl space-y-2">
-                        <input
-                          type="text"
-                          placeholder="Company name"
-                          value={extraUploadExp.company}
-                          onChange={e => setExtraUploadExp(s => ({ ...s, company: e.target.value }))}
-                          className="scratch-input"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Your role / position"
-                          value={extraUploadExp.role}
-                          onChange={e => setExtraUploadExp(s => ({ ...s, role: e.target.value }))}
-                          className="scratch-input"
-                        />
+                        <input type="text" placeholder="Company name" value={extraUploadExp.company} onChange={e => setExtraUploadExp(s => ({ ...s, company: e.target.value }))} className="scratch-input" />
+                        <input type="text" placeholder="Your role / position" value={extraUploadExp.role} onChange={e => setExtraUploadExp(s => ({ ...s, role: e.target.value }))} className="scratch-input" />
                         <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="From (e.g. Jan 2024)"
-                            value={extraUploadExp.from}
-                            onChange={e => setExtraUploadExp(s => ({ ...s, from: e.target.value }))}
-                            className="scratch-input flex-1"
-                          />
-                          <input
-                            type="text"
-                            placeholder="To (e.g. Present)"
-                            value={extraUploadExp.to}
-                            onChange={e => setExtraUploadExp(s => ({ ...s, to: e.target.value }))}
-                            className="scratch-input flex-1"
-                          />
+                          <input type="text" placeholder="From (e.g. Jan 2024)" value={extraUploadExp.from} onChange={e => setExtraUploadExp(s => ({ ...s, from: e.target.value }))} className="scratch-input flex-1" />
+                          <input type="text" placeholder="To (e.g. Present)" value={extraUploadExp.to} onChange={e => setExtraUploadExp(s => ({ ...s, to: e.target.value }))} className="scratch-input flex-1" />
                         </div>
-                        <textarea
-                          placeholder={"Responsibilities & achievements (bullet points recommended)\n• Led a team of 5 engineers...\n• Increased revenue by 30%..."}
-                          value={extraUploadExp.responsibilities}
-                          onChange={e => setExtraUploadExp(s => ({ ...s, responsibilities: e.target.value }))}
-                          className="scratch-textarea min-h-[90px]"
-                        />
+                        <textarea placeholder={"Responsibilities & achievements (bullet points recommended)\n• Led a team of 5 engineers...\n• Increased revenue by 30%..."} value={extraUploadExp.responsibilities} onChange={e => setExtraUploadExp(s => ({ ...s, responsibilities: e.target.value }))} className="scratch-textarea min-h-[90px]" />
                       </div>
                     </div>
                   </div>
@@ -460,61 +550,26 @@ export default function Home() {
                   <div className="space-y-4">
                     <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm text-primary/90 flex items-start gap-3">
                       <div className="mt-0.5"><ExternalLink className="w-4 h-4" /></div>
-                      <div>
-                        <strong>How to get this:</strong> Go to your LinkedIn Profile &rarr; Click "More" &rarr; "Save to PDF".
-                      </div>
+                      <div><strong>How to get this:</strong> Go to your LinkedIn Profile &rarr; Click "More" &rarr; "Save to PDF".</div>
                     </div>
-                    <Dropzone 
+                    <Dropzone
                       accept={{ "application/pdf": [".pdf"] }}
                       selectedFile={linkedinFile}
                       onFileSelect={setLinkedinFile}
                       label="Drop LinkedIn PDF"
                       sublabel="Exported profile PDF"
                     />
-
-                    {/* Structured Additional Experience */}
                     <div className="space-y-2">
-                      <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
-                        Additional / Recent Experience
-                      </label>
+                      <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">Additional / Recent Experience</label>
                       <p className="text-xs text-muted-foreground">Have a new job not on your LinkedIn? Add it here — it will appear first.</p>
                       <div className="p-3 bg-surface border border-border rounded-xl space-y-2">
-                        <input
-                          type="text"
-                          placeholder="Company name"
-                          value={extraLinkedinExp.company}
-                          onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))}
-                          className="scratch-input"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Your role / position"
-                          value={extraLinkedinExp.role}
-                          onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))}
-                          className="scratch-input"
-                        />
+                        <input type="text" placeholder="Company name" value={extraLinkedinExp.company} onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))} className="scratch-input" />
+                        <input type="text" placeholder="Your role / position" value={extraLinkedinExp.role} onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))} className="scratch-input" />
                         <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="From (e.g. Jan 2024)"
-                            value={extraLinkedinExp.from}
-                            onChange={e => setExtraLinkedinExp(s => ({ ...s, from: e.target.value }))}
-                            className="scratch-input flex-1"
-                          />
-                          <input
-                            type="text"
-                            placeholder="To (e.g. Present)"
-                            value={extraLinkedinExp.to}
-                            onChange={e => setExtraLinkedinExp(s => ({ ...s, to: e.target.value }))}
-                            className="scratch-input flex-1"
-                          />
+                          <input type="text" placeholder="From (e.g. Jan 2024)" value={extraLinkedinExp.from} onChange={e => setExtraLinkedinExp(s => ({ ...s, from: e.target.value }))} className="scratch-input flex-1" />
+                          <input type="text" placeholder="To (e.g. Present)" value={extraLinkedinExp.to} onChange={e => setExtraLinkedinExp(s => ({ ...s, to: e.target.value }))} className="scratch-input flex-1" />
                         </div>
-                        <textarea
-                          placeholder={"Responsibilities & achievements (bullet points recommended)\n• Led a team of 5 engineers...\n• Increased revenue by 30%..."}
-                          value={extraLinkedinExp.responsibilities}
-                          onChange={e => setExtraLinkedinExp(s => ({ ...s, responsibilities: e.target.value }))}
-                          className="scratch-textarea min-h-[90px]"
-                        />
+                        <textarea placeholder={"Responsibilities & achievements (bullet points recommended)\n• Led a team of 5 engineers...\n• Increased revenue by 30%..."} value={extraLinkedinExp.responsibilities} onChange={e => setExtraLinkedinExp(s => ({ ...s, responsibilities: e.target.value }))} className="scratch-textarea min-h-[90px]" />
                       </div>
                     </div>
                   </div>
@@ -522,7 +577,6 @@ export default function Home() {
 
                 {mode === "scratch" && (
                   <div className="space-y-6">
-                    {/* Personal Info */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-primary font-medium text-sm">
                         <LayoutTemplate className="w-4 h-4" /> Personal Details
@@ -535,14 +589,10 @@ export default function Home() {
                         <input type="text" placeholder="LinkedIn URL" value={scratchData.linkedin} onChange={e => setScratchData(s => ({...s, linkedin: e.target.value}))} className="scratch-input" />
                       </div>
                     </div>
-
-                    {/* Skills */}
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-muted-foreground">Skills Brain-dump</label>
                       <textarea value={scratchData.skills} onChange={e => setScratchData(s => ({...s, skills: e.target.value}))} placeholder="Python, SQL, Management, Agile..." className="scratch-textarea" />
                     </div>
-
-                    {/* Experience */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-primary font-medium text-sm">
@@ -570,8 +620,6 @@ export default function Home() {
                         ))}
                       </div>
                     </div>
-
-                    {/* Education */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-primary font-medium text-sm">
@@ -592,7 +640,6 @@ export default function Home() {
                         ))}
                       </div>
                     </div>
-                    
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-muted-foreground">Certifications & Extra Notes</label>
                       <textarea value={extraScratchNotes} onChange={e => setExtraScratchNotes(e.target.value)} placeholder="AWS Certified, Published author..." className="scratch-textarea" />
@@ -609,19 +656,15 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">Target Jobs (up to 3)</label>
                 {jds.length < 3 && (
-                  <button 
-                    onClick={() => setJds([...jds, { id: uuidv4(), title: "", company: "", text: "" }])}
-                    className="text-xs font-medium text-primary hover:text-primary-hover flex items-center gap-1"
-                  >
+                  <button onClick={() => setJds([...jds, { id: uuidv4(), title: "", company: "", text: "" }])} className="text-xs font-medium text-primary hover:text-primary-hover flex items-center gap-1">
                     <Plus className="w-3 h-3" /> Add Role
                   </button>
                 )}
               </div>
-              
               <div className="space-y-4">
                 <AnimatePresence>
                   {jds.map((jd, index) => (
-                    <motion.div 
+                    <motion.div
                       key={jd.id}
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
@@ -631,51 +674,17 @@ export default function Home() {
                       <div className="absolute -left-3 top-4 w-6 h-6 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary shadow-glow">
                         {index + 1}
                       </div>
-                      
                       {jds.length > 1 && (
-                        <button 
-                          onClick={() => setJds(jds.filter(j => j.id !== jd.id))}
-                          className="absolute top-4 right-4 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
+                        <button onClick={() => setJds(jds.filter(j => j.id !== jd.id))} className="absolute top-4 right-4 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
-
                       <div className="ml-2 space-y-3">
                         <div className="flex gap-3">
-                          <input 
-                            type="text" 
-                            placeholder="Job Title" 
-                            value={jd.title}
-                            onChange={(e) => {
-                              const newJds = [...jds];
-                              newJds[index].title = e.target.value;
-                              setJds(newJds);
-                            }}
-                            className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:border-primary outline-none"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Company" 
-                            value={jd.company}
-                            onChange={(e) => {
-                              const newJds = [...jds];
-                              newJds[index].company = e.target.value;
-                              setJds(newJds);
-                            }}
-                            className="w-1/3 bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:border-primary outline-none"
-                          />
+                          <input type="text" placeholder="Job Title" value={jd.title} onChange={(e) => { const n = [...jds]; n[index].title = e.target.value; setJds(n); }} className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:border-primary outline-none" />
+                          <input type="text" placeholder="Company" value={jd.company} onChange={(e) => { const n = [...jds]; n[index].company = e.target.value; setJds(n); }} className="w-1/3 bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:border-primary outline-none" />
                         </div>
-                        <textarea 
-                          placeholder="Paste the full job description here..." 
-                          value={jd.text}
-                          onChange={(e) => {
-                            const newJds = [...jds];
-                            newJds[index].text = e.target.value;
-                            setJds(newJds);
-                          }}
-                          className="w-full bg-surface border border-border rounded-lg px-3 py-3 text-sm min-h-[120px] focus:border-primary outline-none resize-y"
-                        />
+                        <textarea placeholder="Paste the full job description here..." value={jd.text} onChange={(e) => { const n = [...jds]; n[index].text = e.target.value; setJds(n); }} className="w-full bg-surface border border-border rounded-lg px-3 py-3 text-sm min-h-[120px] focus:border-primary outline-none resize-y" />
                       </div>
                     </motion.div>
                   ))}
@@ -690,16 +699,7 @@ export default function Home() {
               <label className="text-xs font-bold tracking-wider uppercase text-muted-foreground">Outreach Tone</label>
               <div className="flex gap-2">
                 {(["formal", "warm", "concise"] as Tone[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTone(t)}
-                    className={cn(
-                      "flex-1 py-2 rounded-lg border text-sm font-medium transition-all capitalize",
-                      tone === t 
-                        ? "bg-primary/10 border-primary text-primary shadow-glow" 
-                        : "bg-surface border-border text-muted-foreground hover:border-primary/50"
-                    )}
-                  >
+                  <button key={t} onClick={() => setTone(t)} className={cn("flex-1 py-2 rounded-lg border text-sm font-medium transition-all capitalize", tone === t ? "bg-primary/10 border-primary text-primary shadow-glow" : "bg-surface border-border text-muted-foreground hover:border-primary/50")}>
                     {t}
                   </button>
                 ))}
@@ -715,13 +715,13 @@ export default function Home() {
                 {errorMsg}
               </div>
             )}
-            <button 
+            <button
               onClick={handleGenerate}
               disabled={generateMut.isPending}
               className={cn(
                 "w-full py-4 rounded-xl font-display font-bold text-lg flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden",
-                generateMut.isPending 
-                  ? "bg-surface border border-primary/50 text-primary cursor-wait" 
+                generateMut.isPending
+                  ? "bg-surface border border-primary/50 text-primary cursor-wait"
                   : "bg-gradient-to-r from-primary to-[#c77a10] text-primary-foreground hover:shadow-[0_0_25px_rgba(240,160,32,0.4)] hover:-translate-y-0.5 active:translate-y-0"
               )}
             >
@@ -742,11 +742,11 @@ export default function Home() {
 
         {/* === RIGHT PANEL (OUTPUTS) === */}
         <div className="flex-1 flex flex-col min-w-0 bg-background relative">
-          
+
           {generateMut.isPending ? (
-             <LoadingState />
+            <LoadingState />
           ) : !result && activeFeatureTab !== 'history' ? (
-             <EmptyState />
+            <EmptyState />
           ) : activeFeatureTab === 'history' ? (
             <div className="p-8 h-full flex flex-col">
               <div className="flex items-center justify-between mb-6">
@@ -801,8 +801,8 @@ export default function Home() {
                     onClick={() => setActiveJdTab(idx)}
                     className={cn(
                       "px-5 py-3 text-sm font-medium rounded-t-xl border-x border-t transition-all truncate max-w-[200px]",
-                      activeJdTab === idx 
-                        ? "bg-background border-border text-primary shadow-[0_-4px_10px_rgba(0,0,0,0.2)] z-10" 
+                      activeJdTab === idx
+                        ? "bg-background border-border text-primary shadow-[0_-4px_10px_rgba(0,0,0,0.2)] z-10"
                         : "bg-surface/50 border-transparent text-muted-foreground hover:text-foreground hover:bg-surface"
                     )}
                   >
@@ -820,29 +820,30 @@ export default function Home() {
                     { id: 'cover', label: 'Cover Letter', icon: FileText },
                     { id: 'email', label: 'Outreach', icon: Mail },
                     { id: 'linkedin', label: 'LinkedIn', icon: MessageSquare },
-                    { id: 'refine', label: 'Refine AI', icon: Bot }
+                    { id: 'agent', label: 'RezAI Agent', icon: Zap },
                   ].map(tab => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveFeatureTab(tab.id)}
                       className={cn(
                         "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
-                        activeFeatureTab === tab.id
-                          ? "bg-primary/15 text-primary"
-                          : "text-muted-foreground hover:bg-surface hover:text-foreground"
+                        tab.id === 'agent'
+                          ? activeFeatureTab === 'agent'
+                            ? "bg-primary/15 text-primary"
+                            : "text-primary/70 hover:bg-primary/10 hover:text-primary border border-primary/20"
+                          : activeFeatureTab === tab.id
+                            ? "bg-primary/15 text-primary"
+                            : "text-muted-foreground hover:bg-surface hover:text-foreground"
                       )}
                     >
-                      <tab.icon className="w-4 h-4" /> {tab.label}
+                      <tab.icon className={cn("w-4 h-4", tab.id === 'agent' && "fill-current")} />
+                      {tab.label}
                     </button>
                   ))}
                 </div>
-                
-                <button 
+                <button
                   onClick={() => setActiveFeatureTab('history')}
-                  className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
-                    activeFeatureTab === 'history' ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-                  )}
+                  className={cn("px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors", activeFeatureTab === 'history' ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}
                 >
                   <History className="w-4 h-4" /> History
                 </button>
@@ -857,102 +858,50 @@ export default function Home() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute inset-0 overflow-y-auto p-6 custom-scrollbar"
+                    className={cn(
+                      "absolute inset-0",
+                      activeFeatureTab === 'agent' ? "p-0" : "overflow-y-auto p-6 custom-scrollbar"
+                    )}
                   >
-                    
+
                     {/* --- RESUME --- */}
                     {activeFeatureTab === 'resume' && (
                       <div className="h-full flex flex-col gap-0" style={{ minHeight: 0 }}>
                         <div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0 flex-wrap">
                           <div className="flex items-center bg-surface border border-border rounded-xl p-1 gap-1">
-                            <button
-                              onClick={() => setResumeViewMode("preview")}
-                              className={cn(
-                                "px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all",
-                                resumeViewMode === "preview"
-                                  ? "bg-background text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
+                            <button onClick={() => setResumeViewMode("preview")} className={cn("px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all", resumeViewMode === "preview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
                               <Eye className="w-4 h-4" /> Preview
                             </button>
-                            <button
-                              onClick={() => setResumeViewMode("edit")}
-                              className={cn(
-                                "px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all",
-                                resumeViewMode === "edit"
-                                  ? "bg-background text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
+                            <button onClick={() => setResumeViewMode("edit")} className={cn("px-4 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all", resumeViewMode === "edit" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
                               <FileCode2 className="w-4 h-4" /> Edit
                             </button>
                           </div>
-
                           <div className="flex items-center gap-2 flex-wrap">
-                            <div ref={downloadMenuRef} className="relative flex">
-                              <button
-                                onClick={() => {
-                                  const latex = editableLatex[activeJdTab] || result.results[activeJdTab].latex;
-                                  const jobTitle = result.results[activeJdTab].jobTitle || "resume";
-                                  const company = result.results[activeJdTab].company || "";
-                                  const slug = `${jobTitle}${company ? `-${company}` : ""}`.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-                                  downloadPdf(latex, `${slug}.pdf`);
-                                  setShowDownloadMenu(false);
-                                }}
-                                disabled={downloadingPdf || downloadingDocx}
-                                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-l-lg text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md border-r border-primary-foreground/20"
-                              >
-                                {downloadingPdf
-                                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Compiling…</>
-                                  : <><Download className="w-4 h-4" /> Download PDF</>
-                                }
-                              </button>
-                              <button
-                                onClick={() => setShowDownloadMenu(v => !v)}
-                                disabled={downloadingPdf || downloadingDocx}
-                                className="px-2 py-2 bg-primary text-primary-foreground hover:bg-primary/80 rounded-r-lg text-sm font-semibold flex items-center transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
-                                aria-label="More download options"
-                              >
-                                {downloadingDocx
-                                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                                  : <ChevronDown className="w-4 h-4" />
-                                }
-                              </button>
+                            <div className="relative" ref={downloadMenuRef}>
+                              <div className="flex">
+                                <button onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.pdf`)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-l-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                                  {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                  PDF
+                                </button>
+                                <button onClick={() => setShowDownloadMenu(v => !v)} className="px-2 py-2 bg-primary/90 text-primary-foreground rounded-r-lg border-l border-primary-foreground/20 hover:bg-primary transition-colors">
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                              </div>
                               {showDownloadMenu && (
-                                <div className="absolute right-0 top-full mt-1.5 z-50 bg-surface border border-border rounded-xl shadow-xl overflow-hidden min-w-[180px]">
-                                  <button
-                                    onClick={() => {
-                                      const latex = editableLatex[activeJdTab] || result.results[activeJdTab].latex;
-                                      const jobTitle = result.results[activeJdTab].jobTitle || "resume";
-                                      const company = result.results[activeJdTab].company || "";
-                                      const slug = `${jobTitle}${company ? `-${company}` : ""}`.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-                                      downloadPdf(latex, `${slug}.pdf`);
-                                    }}
-                                    className="w-full px-4 py-3 text-left text-sm font-medium flex items-center gap-3 hover:bg-primary/10 text-foreground transition-colors"
-                                  >
-                                    <span className="text-base">📄</span> Download as PDF
-                                  </button>
-                                  <div className="h-px bg-border mx-3" />
-                                  <button
-                                    onClick={() => {
-                                      const latex = editableLatex[activeJdTab] || result.results[activeJdTab].latex;
-                                      const jobTitle = result.results[activeJdTab].jobTitle || "resume";
-                                      const company = result.results[activeJdTab].company || "";
-                                      const slug = `${jobTitle}${company ? `-${company}` : ""}`.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-                                      downloadDocx(latex, `${slug}.docx`);
-                                    }}
-                                    className="w-full px-4 py-3 text-left text-sm font-medium flex items-center gap-3 hover:bg-primary/10 text-foreground transition-colors"
-                                  >
-                                    <span className="text-base">📝</span> Download as Word
+                                <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-surface border border-border rounded-lg shadow-xl overflow-hidden">
+                                  <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.docx`)} disabled={downloadingDocx} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-foreground hover:bg-surface-hover transition-colors">
+                                    {downloadingDocx ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                    Word (.docx)
                                   </button>
                                 </div>
                               )}
                             </div>
+                            <a href={generateOverleafUrl(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg text-sm font-medium hover:border-primary/50 transition-colors text-foreground">
+                              <ExternalLink className="w-4 h-4" /> Overleaf
+                            </a>
                             <CopyButton text={editableLatex[activeJdTab] || result.results[activeJdTab].latex} label="Copy LaTeX" />
                           </div>
                         </div>
-
                         <div className="flex-1 overflow-hidden rounded-xl border border-border" style={{ minHeight: 0 }}>
                           {resumeViewMode === "preview" ? (
                             previewLoading[activeJdTab] ? (
@@ -989,64 +938,44 @@ export default function Home() {
                     {/* --- ATS SCORE --- */}
                     {activeFeatureTab === 'ats' && (
                       <div className="max-w-4xl mx-auto space-y-6">
-
-                        {/* Keyword Analysis */}
                         {(result.results[activeJdTab].matched_keywords?.length > 0 || result.results[activeJdTab].missing_keywords?.length > 0) && (
                           <div className="bg-surface border border-border rounded-xl p-6 shadow-sm space-y-5">
                             <h3 className="text-lg font-display font-semibold text-foreground">Keyword Analysis</h3>
-
                             {result.results[activeJdTab].matched_keywords?.length > 0 && (
                               <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-success mb-3">
-                                  Found in your resume
-                                </p>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-success mb-3">Found in your resume</p>
                                 <div className="flex flex-wrap gap-2">
                                   {result.results[activeJdTab].matched_keywords.map((kw) => (
-                                    <span
-                                      key={kw}
-                                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20"
-                                    >
-                                      <Check className="w-3 h-3" />
-                                      {kw}
+                                    <span key={kw} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20">
+                                      <Check className="w-3 h-3" />{kw}
                                     </span>
                                   ))}
                                 </div>
                               </div>
                             )}
-
                             {result.results[activeJdTab].missing_keywords?.length > 0 && (
                               <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-destructive mb-3">
-                                  Missing from your resume
-                                </p>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-destructive mb-3">Missing from your resume</p>
                                 <div className="flex flex-wrap gap-2 mb-3">
                                   {result.results[activeJdTab].missing_keywords.map((kw) => (
-                                    <span
-                                      key={kw}
-                                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20"
-                                    >
-                                      <X className="w-3 h-3" />
-                                      {kw}
+                                    <span key={kw} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20">
+                                      <X className="w-3 h-3" />{kw}
                                     </span>
                                   ))}
                                 </div>
                                 <div className="flex items-center justify-between gap-4 flex-wrap">
-                                  <p className="text-xs text-muted-foreground">
-                                    These keywords appear in the job description but not in your resume.
-                                  </p>
+                                  <p className="text-xs text-muted-foreground">These keywords appear in the job description but not in your resume.</p>
                                   <button
-                                    onClick={() => handleFixWithAI(result.results[activeJdTab].missing_keywords)}
+                                    onClick={() => handleFixWithAgent(result.results[activeJdTab].missing_keywords)}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors flex-shrink-0"
                                   >
-                                    Fix with AI
-                                    <ChevronRight className="w-3.5 h-3.5" />
+                                    <Zap className="w-3 h-3 fill-current" /> Fix with RezAI Agent
                                   </button>
                                 </div>
                               </div>
                             )}
                           </div>
                         )}
-
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <AtsCard title="Original Resume" data={result.results[activeJdTab].atsOriginal} type="neutral" />
                           <AtsCard title="Tailored Version" data={result.results[activeJdTab].atsTailored} type="success" />
@@ -1057,9 +986,7 @@ export default function Home() {
                             <p className="text-muted-foreground text-sm mt-1">Your resume was rewritten to hit target keywords and use the XYZ impact formula.</p>
                           </div>
                           <div className="text-right">
-                            <div className="text-4xl font-mono font-bold text-primary">
-                              +{Math.max(0, result.results[activeJdTab].atsTailored.score - result.results[activeJdTab].atsOriginal.score)}
-                            </div>
+                            <div className="text-4xl font-mono font-bold text-primary">+{Math.max(0, result.results[activeJdTab].atsTailored.score - result.results[activeJdTab].atsOriginal.score)}</div>
                             <div className="text-xs font-bold uppercase tracking-wider text-primary/70">Point Increase</div>
                           </div>
                         </div>
@@ -1069,13 +996,9 @@ export default function Home() {
                     {/* --- COVER LETTER --- */}
                     {activeFeatureTab === 'cover' && (
                       <div className="max-w-3xl mx-auto h-full flex flex-col">
-                        <div className="flex justify-end mb-4 flex-shrink-0">
-                          <CopyButton text={result.results[activeJdTab].coverLetter} />
-                        </div>
+                        <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={result.results[activeJdTab].coverLetter} /></div>
                         <div className="flex-1 bg-surface border border-border rounded-xl p-8 overflow-auto shadow-sm">
-                          <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">
-                            {result.results[activeJdTab].coverLetter}
-                          </p>
+                          <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.results[activeJdTab].coverLetter}</p>
                         </div>
                       </div>
                     )}
@@ -1083,13 +1006,9 @@ export default function Home() {
                     {/* --- EMAIL --- */}
                     {activeFeatureTab === 'email' && (
                       <div className="max-w-3xl mx-auto h-full flex flex-col">
-                        <div className="flex justify-end mb-4 flex-shrink-0">
-                          <CopyButton text={result.results[activeJdTab].email} />
-                        </div>
+                        <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={result.results[activeJdTab].email} /></div>
                         <div className="bg-surface border border-border rounded-xl p-8 shadow-sm">
-                          <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">
-                            {result.results[activeJdTab].email}
-                          </p>
+                          <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.results[activeJdTab].email}</p>
                         </div>
                       </div>
                     )}
@@ -1099,99 +1018,106 @@ export default function Home() {
                       <div className="max-w-3xl mx-auto space-y-6">
                         <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
                           <div className="bg-[#0a66c2]/10 border-b border-border px-6 py-3 flex justify-between items-center">
-                            <h3 className="font-semibold text-[#0a66c2] flex items-center gap-2">
-                              <MessageSquare className="w-4 h-4" /> Optimized Headline
-                            </h3>
+                            <h3 className="font-semibold text-[#0a66c2] flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Optimized Headline</h3>
                             <CopyButton text={result.linkedin.headline} minimal />
                           </div>
-                          <div className="p-6">
-                            <p className="text-lg font-medium text-foreground leading-snug">{result.linkedin.headline}</p>
-                          </div>
+                          <div className="p-6"><p className="text-lg font-medium text-foreground leading-snug">{result.linkedin.headline}</p></div>
                         </div>
                         <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm">
                           <div className="bg-[#0a66c2]/10 border-b border-border px-6 py-3 flex justify-between items-center">
-                            <h3 className="font-semibold text-[#0a66c2] flex items-center gap-2">
-                              <MessageSquare className="w-4 h-4" /> About Section
-                            </h3>
+                            <h3 className="font-semibold text-[#0a66c2] flex items-center gap-2"><MessageSquare className="w-4 h-4" /> About Section</h3>
                             <CopyButton text={result.linkedin.about} minimal />
                           </div>
-                          <div className="p-6">
-                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.linkedin.about}</p>
-                          </div>
+                          <div className="p-6"><p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.linkedin.about}</p></div>
                         </div>
                       </div>
                     )}
 
-                    {/* --- REFINE AI --- */}
-                    {activeFeatureTab === 'refine' && (
-                      <div className="max-w-3xl mx-auto h-full flex flex-col" style={{ minHeight: 400 }}>
-                        <div className="flex-1 overflow-y-auto space-y-4 pb-4 custom-scrollbar">
-                          {(refineMessages[activeJdTab] || []).map((msg, i) => {
-                            const msgs = refineMessages[activeJdTab] || [];
-                            const noUserMsgsYet = !msgs.some(m => m.role === "user");
-                            return (
-                              <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
-                                {msg.role === "assistant" && (
-                                  <div className="w-8 h-8 rounded-full bg-primary/15 flex-shrink-0 flex items-center justify-center mt-1">
-                                    <Bot className="w-4 h-4 text-primary" />
-                                  </div>
-                                )}
-                                <div className={cn(
-                                  "max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap",
-                                  msg.role === "user"
-                                    ? "bg-primary text-primary-foreground rounded-tr-sm"
-                                    : "bg-surface border border-border text-foreground rounded-tl-sm"
-                                )}>
-                                  {msg.content}
-                                  {/* Quick-action chips: only below the greeting (first msg) when no user msg sent yet */}
-                                  {msg.role === "assistant" && i === 0 && noUserMsgsYet && (
-                                    <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-border/50">
-                                      {REFINE_QUICK_CHIPS.map(chip => (
-                                        <button
-                                          key={chip}
-                                          onClick={() => sendRefineMessage(chip)}
-                                          disabled={!!refineLoading[activeJdTab]}
-                                          className="px-3 py-1.5 bg-background border border-border rounded-full text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                        >
-                                          {chip}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {refineLoading[activeJdTab] && (
-                            <div className="flex gap-3 justify-start">
-                              <div className="w-8 h-8 rounded-full bg-primary/15 flex-shrink-0 flex items-center justify-center mt-1">
-                                <Bot className="w-4 h-4 text-primary" />
-                              </div>
-                              <div className="bg-surface border border-border px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                <span className="text-sm text-muted-foreground">Refining your resume...</span>
-                              </div>
+                    {/* --- REZAI AGENT TAB (two-column) --- */}
+                    {activeFeatureTab === 'agent' && (
+                      <div className="h-full flex">
+                        {/* Left — Chat (55%) */}
+                        <div className="flex flex-col border-r border-[#1e304a]" style={{ width: "55%" }}>
+                          {/* Chat header */}
+                          <div className="flex-shrink-0 px-5 py-3 border-b border-[#1e304a] flex items-center gap-3 bg-[#070c18]">
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+                              <Zap className="w-4 h-4 text-primary fill-current" />
                             </div>
-                          )}
-                          <div ref={refineBottomRef} />
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">RezAI Agent</p>
+                              <p className="text-xs text-muted-foreground">Resume for {result.results[activeJdTab].company}</p>
+                            </div>
+                          </div>
+                          {/* Messages */}
+                          <div className="flex-1 overflow-hidden px-5">
+                            {renderAgentChat({
+                              messages: agentMessages[activeJdTab] || [],
+                              loading: !!agentLoading[activeJdTab],
+                              bottomRef: agentBottomRef,
+                            })}
+                          </div>
+                          {/* Input */}
+                          <div className="flex-shrink-0 px-5 py-4 border-t border-[#1e304a] bg-[#070c18]">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={agentInput}
+                                onChange={e => setAgentInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
+                                placeholder="Edit resume or ask career questions..."
+                                className="flex-1 bg-[#0c1626] border border-[#1e304a] rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+                                disabled={!!agentLoading[activeJdTab]}
+                              />
+                              <button
+                                onClick={handleAgentSend}
+                                disabled={!agentInput.trim() || !!agentLoading[activeJdTab]}
+                                className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0"
+                              >
+                                {agentLoading[activeJdTab] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-shrink-0 flex gap-2 pt-4 border-t border-border">
-                          <input
-                            type="text"
-                            value={refineInput}
-                            onChange={e => setRefineInput(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleRefine(); } }}
-                            placeholder="Ask me to improve your resume... e.g. Add more Python keywords, shorten the summary, fix grammar"
-                            className="flex-1 bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
-                            disabled={refineLoading[activeJdTab]}
-                          />
-                          <button
-                            onClick={handleRefine}
-                            disabled={!refineInput.trim() || refineLoading[activeJdTab]}
-                            className="px-4 py-3 bg-primary rounded-xl text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors flex items-center gap-2 font-medium text-sm"
-                          >
-                            {refineLoading[activeJdTab] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                          </button>
+
+                        {/* Right — Live Preview (45%) */}
+                        <div className="flex flex-col bg-[#070c18]" style={{ width: "45%" }}>
+                          <div className="flex-shrink-0 px-5 py-3 border-b border-[#1e304a] flex items-center justify-between">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Live Preview</p>
+                            {previewLoading[activeJdTab] && (
+                              <div className="flex items-center gap-1.5 text-xs text-primary">
+                                <Loader2 className="w-3 h-3 animate-spin" /> Updating...
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            {previewBlobs[activeJdTab] ? (
+                              <PdfPreview blob={previewBlobs[activeJdTab]} />
+                            ) : (
+                              <div className="h-full flex flex-col items-center justify-center gap-3 bg-[#0c1626]/40">
+                                <FileCode2 className="w-10 h-10 text-muted-foreground/30" />
+                                <p className="text-sm text-muted-foreground/60">Preview loading...</p>
+                              </div>
+                            )}
+                          </div>
+                          {/* Download buttons */}
+                          <div className="flex-shrink-0 px-4 py-3 border-t border-[#1e304a] flex gap-2">
+                            <button
+                              onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex)}
+                              disabled={downloadingPdf || !editableLatex[activeJdTab]}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary/10 border border-primary/25 text-primary rounded-lg text-xs font-semibold hover:bg-primary/20 transition-colors disabled:opacity-40"
+                            >
+                              {downloadingPdf ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                              Download PDF
+                            </button>
+                            <button
+                              onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex)}
+                              disabled={downloadingDocx || !editableLatex[activeJdTab]}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-surface border border-border text-muted-foreground rounded-lg text-xs font-semibold hover:text-foreground hover:border-border/80 transition-colors disabled:opacity-40"
+                            >
+                              {downloadingDocx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                              Download Word
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1201,10 +1127,104 @@ export default function Home() {
               </div>
             </>
           ) : null}
-          
+
         </div>
       </main>
-      
+
+      {/* ── FLOATING AGENT BUBBLE ─────────────────────────────────────────── */}
+      {result && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+          {/* Chat panel */}
+          <AnimatePresence>
+            {agentOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 16, scale: 0.96 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="w-[380px] h-[520px] rounded-2xl bg-[#0c1626] border border-[#1e304a] shadow-2xl flex flex-col overflow-hidden"
+                style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(240,160,32,0.08)" }}
+              >
+                {/* Panel header */}
+                <div className="flex-shrink-0 px-4 py-3 bg-[#070c18] border-b border-[#1e304a] flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+                      <Zap className="w-3.5 h-3.5 text-primary fill-current" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground leading-none">RezAI Agent</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Resume for {result.results[activeJdTab]?.company || "—"} loaded
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={() => setAgentOpen(false)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-white/5">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-hidden px-4">
+                  {renderAgentChat({
+                    messages: agentMessages[activeJdTab] || [],
+                    loading: !!agentLoading[activeJdTab],
+                    bottomRef: agentBubbleBottomRef,
+                    compact: true,
+                  })}
+                </div>
+
+                {/* Input */}
+                <div className="flex-shrink-0 px-3 pb-3 pt-2 border-t border-[#1e304a] bg-[#070c18] space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={agentInput}
+                      onChange={e => setAgentInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
+                      placeholder="Edit resume or ask career questions..."
+                      className="flex-1 bg-[#0c1626] border border-[#1e304a] rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+                      disabled={!!agentLoading[activeJdTab]}
+                    />
+                    <button
+                      onClick={handleAgentSend}
+                      disabled={!agentInput.trim() || !!agentLoading[activeJdTab]}
+                      className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0"
+                    >
+                      {agentLoading[activeJdTab] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 fill-current" />}
+                    </button>
+                  </div>
+                  {/* Open full view link */}
+                  <button
+                    onClick={() => { setActiveFeatureTab("agent"); setAgentOpen(false); }}
+                    className="w-full text-center text-xs text-muted-foreground hover:text-primary transition-colors py-0.5"
+                  >
+                    ↗ Open full view
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Bubble button */}
+          <div className="relative">
+            {/* Pulse ring */}
+            {!agentOpen && (
+              <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping pointer-events-none" style={{ animationDuration: "2s" }} />
+            )}
+            <button
+              onClick={() => setAgentOpen(v => !v)}
+              title="Chat with RezAI Agent"
+              className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 hover:bg-primary/90 hover:scale-105 active:scale-95 transition-all duration-200"
+            >
+              {agentOpen
+                ? <X className="w-6 h-6 text-primary-foreground" />
+                : <Zap className="w-6 h-6 text-primary-foreground fill-current" />
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{__html: `
         .scratch-input {
           @apply w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all;

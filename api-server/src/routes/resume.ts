@@ -484,82 +484,120 @@ router.post(
   },
 );
 
-// ── Refine Resume via chat instruction ────────────────────────────────────────
+// ── RezAI Agent — unified career coach endpoint ──────────────────────────────
 router.post(
-  "/refine",
+  "/agent",
   async (req: Request, res: Response) => {
-    const { latex, instruction, jd } = req.body as {
+    const {
+      latex,
+      message,
+      history = [],
+      jd,
+      atsOriginal,
+      atsTailored,
+      matchedKeywords = [],
+      missingKeywords = [],
+      currentTab = "resume",
+    } = req.body as {
       latex?: string;
-      instruction?: string;
+      message?: string;
+      history?: { role: "user" | "assistant"; content: string }[];
       jd?: { title?: string; company?: string; text?: string };
+      atsOriginal?: { score: number; breakdown: string };
+      atsTailored?: { score: number; breakdown: string };
+      matchedKeywords?: string[];
+      missingKeywords?: string[];
+      currentTab?: string;
     };
 
-    if (!latex || !instruction) {
-      res.status(400).json({ error: "latex and instruction are required." });
+    if (!message) {
+      res.status(400).json({ error: "message is required." });
       return;
     }
 
     const system = [
-      "You are an expert resume writer and LaTeX developer acting as a career coach chatbot.",
-      "The user has an existing LaTeX resume and wants to refine it based on their instruction.",
-      "Apply the instruction precisely.",
+      "You are RezAI Agent — a world-class career coach, resume expert, and interview specialist.",
       "",
-      "━━━ RULES ━━━",
-      String.raw`• Keep the exact same preamble (\usepackage{helvet}, \renewcommand, etc.)`,
-      "• Do NOT add markdown fences (no ```latex) inside the LATEX tag",
-      "• Preserve all content not mentioned in the instruction",
-      "• If the instruction asks to improve ATS score, weave in more relevant keywords from the JD naturally",
+      "━━━ CANDIDATE CONTEXT ━━━",
+      `TARGET JOB: ${jd?.title || "Unknown role"} at ${jd?.company || "Unknown company"}`,
+      `JOB DESCRIPTION: ${(jd?.text || "").slice(0, 1000)}`,
+      `ATS SCORE: ${atsOriginal?.score ?? "?"} → ${atsTailored?.score ?? "?"}`,
+      `MATCHED KEYWORDS: ${matchedKeywords.join(", ") || "none"}`,
+      `MISSING KEYWORDS: ${missingKeywords.join(", ") || "none"}`,
+      `USER IS CURRENTLY ON: ${currentTab} tab`,
+      latex ? `\nRESUME (LaTeX):\n${latex}` : "",
       "",
-      "━━━ OUTPUT FORMAT (use EXACT tags) ━━━",
-      "<LATEX>",
-      String.raw`[complete updated LaTeX from \documentclass to \end{document}]`,
-      "</LATEX>",
-      "<CHANGES>",
-      "Here is what I changed:",
-      "→ [concise description of change 1]",
-      "→ [concise description of change 2]",
-      "→ [concise description of change 3, if applicable]",
-      "Want me to improve anything else?",
-      "</CHANGES>",
+      "━━━ YOU DO TWO THINGS ━━━",
+      "",
+      "THING 1 — EDIT RESUME:",
+      "When user wants to edit/improve/fix/add/shorten anything in the resume:",
+      "→ Make the changes to the LaTeX",
+      "→ Return the complete updated LaTeX in <LATEX> tags",
+      "→ Explain exactly what changed in the MESSAGE using → bullets",
+      String.raw`• Always keep the exact same preamble (\usepackage{helvet}, etc.)`,
+      "• Do NOT add markdown fences inside LATEX tags",
+      "",
+      "THING 2 — ANSWER CAREER QUESTIONS:",
+      "When user asks about job fit, salary, interview prep, career advice, emails, LinkedIn, RezAI features:",
+      "→ Answer conversationally using their ACTUAL data (real company name, real scores, real keywords)",
+      "→ Do NOT return LaTeX — leave <LATEX> empty",
+      "",
+      "━━━ FEATURE ACTIONS (add when relevant) ━━━",
+      "Use one of these inside <ACTION> when it makes sense to direct the user:",
+      "tab:resume  tab:ats  tab:cover  tab:email  tab:linkedin",
+      "download:pdf  download:docx",
+      "",
+      "━━━ STRICT RULES ━━━",
+      "• Only help with: resume, career, jobs, interviews, salary, LinkedIn, job search, cover letters",
+      "• If asked anything outside these topics, respond: 'I am RezAI Agent — I specialise in career topics only!'",
+      "• Always use the candidate's ACTUAL data — never give generic advice",
+      "• Always be warm, specific, and encouraging",
+      "• Always end your message with a follow-up question or a concrete next-step suggestion",
+      "• Remember the full conversation history provided",
+      "",
+      "━━━ RESPONSE FORMAT — ALWAYS USE THESE EXACT TAGS ━━━",
+      "<TYPE>edit</TYPE>  OR  <TYPE>answer</TYPE>",
+      "<LATEX>[complete updated LaTeX if type=edit, otherwise leave empty]</LATEX>",
+      "<MESSAGE>[your full response to the user]</MESSAGE>",
+      "<ACTION>[one action string from the list above, or leave empty]</ACTION>",
     ].join("\n");
 
-    const jdContext = jd?.text
-      ? `\n\nJOB DESCRIPTION CONTEXT:\nRole: ${jd.title || ""} at ${jd.company || ""}\n${jd.text}`
-      : "";
-
-    const userMessage = `CURRENT LATEX RESUME:\n${latex}${jdContext}\n\nUSER INSTRUCTION: ${instruction}`;
+    // Build multi-turn conversation: history + current user message
+    const messages: { role: "user" | "assistant"; content: string }[] = [
+      ...history,
+      { role: "user", content: message },
+    ];
 
     try {
-      const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
         max_tokens: 8192,
         system,
-        messages: [{ role: "user", content: userMessage }],
+        messages,
       });
 
-      const raw = message.content
+      const raw = response.content
         .filter((b: { type: string }) => b.type === "text")
         .map((b: { type: string; text: string }) => b.text)
         .join("");
 
-      // Extract latex from <LATEX> tag, strip any stray fences as fallback
-      const refined = (extractTag(raw, "LATEX") || raw)
-        .replace(/^```latex\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
+      const type = (extractTag(raw, "TYPE") || "answer").trim() as "edit" | "answer";
+      const latexRaw = extractTag(raw, "LATEX").trim();
+      const latex_out = type === "edit" && latexRaw
+        ? latexRaw.replace(/^```latex\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim()
+        : null;
+      const agentMessage = extractTag(raw, "MESSAGE").trim()
+        || "I've processed your request. Is there anything else I can help you with?";
+      const action = extractTag(raw, "ACTION").trim() || null;
 
-      const changesMsg = extractTag(raw, "CHANGES").trim()
-        || "Done! Your resume has been updated. Switch to the Resume tab to see the changes.";
-
-      res.json({ latex: refined, message: changesMsg });
+      res.json({ type, latex: latex_out, message: agentMessage, action });
     } catch (err) {
-      req.log.error({ err }, "Refine failed");
+      req.log.error({ err }, "Agent failed");
       res.status(500).json({
-        error: err instanceof Error ? err.message : "Refinement failed.",
+        error: err instanceof Error ? err.message : "Agent request failed.",
       });
     }
-  }
+  },
 );
 
 export default router;
