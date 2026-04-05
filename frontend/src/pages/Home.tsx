@@ -19,6 +19,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PdfPreview } from "@/components/ui/PdfPreview";
 import { ResumeEditor } from "@/components/ui/ResumeEditor";
 
+// -- Refine quick-action chips --
+const REFINE_QUICK_CHIPS = [
+  "Add missing keywords",
+  "Improve ATS score",
+  "Shorten to 1 page",
+  "Strengthen summary",
+  "Fix weak verbs",
+  "Make bullets quantified",
+] as const;
+
 // -- Initial States --
 const initialScratchData: ScratchData = {
   name: "", email: "", phone: "", location: "", linkedin: "", skills: "",
@@ -90,6 +100,7 @@ export default function Home() {
   const [refineMessages, setRefineMessages] = useState<Record<number, RefineMsg[]>>({});
   const [refineInput, setRefineInput] = useState("");
   const [refineLoading, setRefineLoading] = useState<Record<number, boolean>>({});
+  const [refineGreeted, setRefineGreeted] = useState<Record<number, boolean>>({});
   const refineBottomRef = useRef<HTMLDivElement>(null);
 
   // -- Hooks --
@@ -144,19 +155,32 @@ export default function Home() {
     refineBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [refineMessages, refineLoading]);
 
-  const handleRefine = async () => {
-    const latex = editableLatex[activeJdTab] || result?.results[activeJdTab]?.latex || "";
-    const instruction = refineInput.trim();
-    if (!instruction || !latex || refineLoading[activeJdTab]) return;
+  // Inject greeting when Refine tab is first opened for each JD
+  useEffect(() => {
+    if (activeFeatureTab !== "refine" || !result || refineGreeted[activeJdTab]) return;
+    const r = result.results[activeJdTab];
+    if (!r) return;
+    const greeting =
+      `Hi! I've reviewed your resume for ${r.company}. ` +
+      `Your ATS score improved from ${r.atsOriginal.score} to ${r.atsTailored.score}.\n\n` +
+      `Here's what I can help you with next:`;
+    setRefineMessages(prev => ({ ...prev, [activeJdTab]: [{ role: "assistant" as const, content: greeting }] }));
+    setRefineGreeted(prev => ({ ...prev, [activeJdTab]: true }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFeatureTab, activeJdTab]);
+
+  // Core send logic — used by handleRefine, quick chips, and Fix with AI
+  const sendRefineMessage = async (instruction: string, tab = activeJdTab) => {
+    const latex = editableLatex[tab] || result?.results[tab]?.latex || "";
+    if (!instruction || !latex || refineLoading[tab]) return;
 
     const userMsg: RefineMsg = { role: "user", content: instruction };
-    setRefineMessages(prev => ({ ...prev, [activeJdTab]: [...(prev[activeJdTab] || []), userMsg] }));
-    setRefineInput("");
-    setRefineLoading(prev => ({ ...prev, [activeJdTab]: true }));
+    setRefineMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), userMsg] }));
+    setRefineLoading(prev => ({ ...prev, [tab]: true }));
 
     try {
       const baseUrl = import.meta.env.BASE_URL || "/";
-      const jd = jds[activeJdTab];
+      const jd = jds[tab];
       const res = await fetch(`${baseUrl}api/resume/refine`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,21 +190,39 @@ export default function Home() {
       const data = await res.json();
       const newLatex: string = data.latex;
 
-      setEditableLatex(prev => ({ ...prev, [activeJdTab]: newLatex }));
-      setPreviewLoading(prev => ({ ...prev, [activeJdTab]: true }));
+      setEditableLatex(prev => ({ ...prev, [tab]: newLatex }));
+      setPreviewLoading(prev => ({ ...prev, [tab]: true }));
       compileLatexToBlob(newLatex).then(blob => {
-        if (blob) setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
-        setPreviewLoading(prev => ({ ...prev, [activeJdTab]: false }));
+        if (blob) setPreviewBlobs(prev => ({ ...prev, [tab]: blob }));
+        setPreviewLoading(prev => ({ ...prev, [tab]: false }));
       });
 
-      const assistantMsg: RefineMsg = { role: "assistant", content: "Done! Your resume has been updated. Switch to the Resume tab to see the changes." };
-      setRefineMessages(prev => ({ ...prev, [activeJdTab]: [...(prev[activeJdTab] || []), assistantMsg] }));
+      const assistantMsg: RefineMsg = {
+        role: "assistant",
+        content: data.message || "Done! Your resume has been updated. Switch to the Resume tab to see the changes.",
+      };
+      setRefineMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), assistantMsg] }));
     } catch {
       const errMsg: RefineMsg = { role: "assistant", content: "Something went wrong. Please try again." };
-      setRefineMessages(prev => ({ ...prev, [activeJdTab]: [...(prev[activeJdTab] || []), errMsg] }));
+      setRefineMessages(prev => ({ ...prev, [tab]: [...(prev[tab] || []), errMsg] }));
     } finally {
-      setRefineLoading(prev => ({ ...prev, [activeJdTab]: false }));
+      setRefineLoading(prev => ({ ...prev, [tab]: false }));
     }
+  };
+
+  const handleRefine = async () => {
+    const instruction = refineInput.trim();
+    if (!instruction) return;
+    setRefineInput("");
+    await sendRefineMessage(instruction);
+  };
+
+  // Fix with AI — switches to Refine tab and auto-sends missing keywords message
+  const handleFixWithAI = (missingKeywords: string[]) => {
+    const instruction = `Add these missing keywords naturally into my resume: ${missingKeywords.join(", ")}`;
+    setActiveFeatureTab("refine");
+    // Short delay lets the greeting inject before the user message appears
+    setTimeout(() => sendRefineMessage(instruction), 80);
   };
 
   // -- Compile latex → Blob for preview --
@@ -988,9 +1030,18 @@ export default function Home() {
                                     </span>
                                   ))}
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                  These keywords appear in the job description but not in your resume. Use <span className="text-primary font-medium">Refine AI</span> to add them.
-                                </p>
+                                <div className="flex items-center justify-between gap-4 flex-wrap">
+                                  <p className="text-xs text-muted-foreground">
+                                    These keywords appear in the job description but not in your resume.
+                                  </p>
+                                  <button
+                                    onClick={() => handleFixWithAI(result.results[activeJdTab].missing_keywords)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors flex-shrink-0"
+                                  >
+                                    Fix with AI
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1075,34 +1126,42 @@ export default function Home() {
                     {activeFeatureTab === 'refine' && (
                       <div className="max-w-3xl mx-auto h-full flex flex-col" style={{ minHeight: 400 }}>
                         <div className="flex-1 overflow-y-auto space-y-4 pb-4 custom-scrollbar">
-                          {!(refineMessages[activeJdTab]?.length) && (
-                            <div className="text-center py-12">
-                              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                                <Bot className="w-8 h-8 text-primary" />
-                              </div>
-                              <h3 className="font-display font-semibold text-lg text-foreground">Refine with AI</h3>
-                              <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto leading-relaxed">
-                                Type a command to improve your resume. The AI will update it instantly and you can re-download.
-                              </p>
-                              <div className="flex flex-wrap justify-center gap-2 mt-5">
-                                {["Increase ATS score","Make bullets more quantified","Shorten to fit 1 page","Add more technical keywords","Strengthen the summary","Fix grammar and tone"].map(s => (
-                                  <button key={s} onClick={() => setRefineInput(s)} className="px-3 py-1.5 bg-surface border border-border rounded-full text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors">{s}</button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {(refineMessages[activeJdTab] || []).map((msg, i) => (
-                            <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
-                              {msg.role === "assistant" && (
-                                <div className="w-8 h-8 rounded-full bg-primary/15 flex-shrink-0 flex items-center justify-center mt-1">
-                                  <Bot className="w-4 h-4 text-primary" />
+                          {(refineMessages[activeJdTab] || []).map((msg, i) => {
+                            const msgs = refineMessages[activeJdTab] || [];
+                            const noUserMsgsYet = !msgs.some(m => m.role === "user");
+                            return (
+                              <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "justify-start")}>
+                                {msg.role === "assistant" && (
+                                  <div className="w-8 h-8 rounded-full bg-primary/15 flex-shrink-0 flex items-center justify-center mt-1">
+                                    <Bot className="w-4 h-4 text-primary" />
+                                  </div>
+                                )}
+                                <div className={cn(
+                                  "max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap",
+                                  msg.role === "user"
+                                    ? "bg-primary text-primary-foreground rounded-tr-sm"
+                                    : "bg-surface border border-border text-foreground rounded-tl-sm"
+                                )}>
+                                  {msg.content}
+                                  {/* Quick-action chips: only below the greeting (first msg) when no user msg sent yet */}
+                                  {msg.role === "assistant" && i === 0 && noUserMsgsYet && (
+                                    <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-border/50">
+                                      {REFINE_QUICK_CHIPS.map(chip => (
+                                        <button
+                                          key={chip}
+                                          onClick={() => sendRefineMessage(chip)}
+                                          disabled={!!refineLoading[activeJdTab]}
+                                          className="px-3 py-1.5 bg-background border border-border rounded-full text-xs text-muted-foreground hover:text-primary hover:border-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                          {chip}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                              <div className={cn("max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed", msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-surface border border-border text-foreground rounded-tl-sm")}>
-                                {msg.content}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                           {refineLoading[activeJdTab] && (
                             <div className="flex gap-3 justify-start">
                               <div className="w-8 h-8 rounded-full bg-primary/15 flex-shrink-0 flex items-center justify-center mt-1">
@@ -1122,7 +1181,7 @@ export default function Home() {
                             value={refineInput}
                             onChange={e => setRefineInput(e.target.value)}
                             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleRefine(); } }}
-                            placeholder="e.g. Increase ATS score, add Python to skills, shorten to 1 page..."
+                            placeholder="Ask me to improve your resume... e.g. Add more Python keywords, shorten the summary, fix grammar"
                             className="flex-1 bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
                             disabled={refineLoading[activeJdTab]}
                           />

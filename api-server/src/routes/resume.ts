@@ -500,22 +500,34 @@ router.post(
     }
 
     const system = [
-      "You are an expert resume writer and LaTeX developer.",
+      "You are an expert resume writer and LaTeX developer acting as a career coach chatbot.",
       "The user has an existing LaTeX resume and wants to refine it based on their instruction.",
-      "Apply the instruction precisely and return ONLY the complete updated LaTeX code.",
-      "Rules:",
-      String.raw`• Keep the exact same preamble (\\usepackage{helvet}, \\renewcommand, etc.)`,
-      "• Do NOT add markdown fences (no ```latex), no explanation, no comments outside LaTeX",
+      "Apply the instruction precisely.",
+      "",
+      "━━━ RULES ━━━",
+      String.raw`• Keep the exact same preamble (\usepackage{helvet}, \renewcommand, etc.)`,
+      "• Do NOT add markdown fences (no ```latex) inside the LATEX tag",
       "• Preserve all content not mentioned in the instruction",
       "• If the instruction asks to improve ATS score, weave in more relevant keywords from the JD naturally",
-      "• Return only raw LaTeX from \\documentclass to \\end{document}",
+      "",
+      "━━━ OUTPUT FORMAT (use EXACT tags) ━━━",
+      "<LATEX>",
+      String.raw`[complete updated LaTeX from \documentclass to \end{document}]`,
+      "</LATEX>",
+      "<CHANGES>",
+      "Here is what I changed:",
+      "→ [concise description of change 1]",
+      "→ [concise description of change 2]",
+      "→ [concise description of change 3, if applicable]",
+      "Want me to improve anything else?",
+      "</CHANGES>",
     ].join("\n");
 
     const jdContext = jd?.text
       ? `\n\nJOB DESCRIPTION CONTEXT:\nRole: ${jd.title || ""} at ${jd.company || ""}\n${jd.text}`
       : "";
 
-    const userMessage = `CURRENT LATEX RESUME:\n${latex}${jdContext}\n\nUSER INSTRUCTION: ${instruction}\n\nReturn only the complete updated LaTeX.`;
+    const userMessage = `CURRENT LATEX RESUME:\n${latex}${jdContext}\n\nUSER INSTRUCTION: ${instruction}`;
 
     try {
       const message = await anthropic.messages.create({
@@ -530,14 +542,17 @@ router.post(
         .map((b: { type: string; text: string }) => b.text)
         .join("");
 
-      // Strip any markdown fences if Claude adds them
-      const refined = raw
+      // Extract latex from <LATEX> tag, strip any stray fences as fallback
+      const refined = (extractTag(raw, "LATEX") || raw)
         .replace(/^```latex\s*/i, "")
         .replace(/^```\s*/i, "")
         .replace(/\s*```$/i, "")
         .trim();
 
-      res.json({ latex: refined });
+      const changesMsg = extractTag(raw, "CHANGES").trim()
+        || "Done! Your resume has been updated. Switch to the Resume tab to see the changes.";
+
+      res.json({ latex: refined, message: changesMsg });
     } catch (err) {
       req.log.error({ err }, "Refine failed");
       res.status(500).json({
