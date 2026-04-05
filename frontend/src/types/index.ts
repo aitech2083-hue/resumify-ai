@@ -47,6 +47,8 @@ export interface JobResult {
   latex: string;
   atsOriginal: AtsScore;
   atsTailored: AtsScore;
+  matched_keywords: string[];
+  missing_keywords: string[];
   email: string;
   coverLetter: string;
 }

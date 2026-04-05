@@ -47,6 +47,8 @@ interface JobResult {
   latex: string;
   atsOriginal: AtsScore;
   atsTailored: AtsScore;
+  matched_keywords: string[];
+  missing_keywords: string[];
   email: string;
   coverLetter: string;
 }
@@ -165,6 +167,8 @@ async function generateResumeAndATS(
   latex: string;
   atsOriginal: AtsScore;
   atsTailored: AtsScore;
+  matched_keywords: string[];
+  missing_keywords: string[];
 }> {
   const preambleExample = [
     String.raw`\documentclass[11pt]{article}`,
@@ -250,6 +254,12 @@ async function generateResumeAndATS(
     "score:[integer 0-100]",
     "breakdown:[2-3 sentences on how tailored version improved]",
     "</ATS_AFTER>",
+    "<KEYWORDS_MATCHED>",
+    "[comma separated list of important keywords from the JD that are already present in the resume]",
+    "</KEYWORDS_MATCHED>",
+    "<KEYWORDS_MISSING>",
+    "[comma separated list of important keywords from the JD that are completely missing from the resume]",
+    "</KEYWORDS_MISSING>",
   ].join("\n");
 
   const jdBlock = `TARGET ROLE: ${jd.title || "Position"} at ${jd.company || "Company"}\n\nJOB DESCRIPTION:\n${jd.text}`;
@@ -260,10 +270,18 @@ async function generateResumeAndATS(
   const before = extractTag(raw, "ATS_BEFORE") || "";
   const after = extractTag(raw, "ATS_AFTER") || "";
 
+  const parseKeywords = (tag: string): string[] =>
+    (extractTag(raw, tag) || "")
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+
   return {
     latex,
     atsOriginal: { score: parseScore(before), breakdown: parseBreakdown(before) },
     atsTailored: { score: parseScore(after), breakdown: parseBreakdown(after) },
+    matched_keywords: parseKeywords("KEYWORDS_MATCHED"),
+    missing_keywords: parseKeywords("KEYWORDS_MISSING"),
   };
 }
 
