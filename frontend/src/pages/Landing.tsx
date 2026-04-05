@@ -102,7 +102,7 @@ function Navbar() {
 // ── Hero ───────────────────────────────────────────────────────────────────
 function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+    <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background glow orbs */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[#f0a020]/5 blur-[120px]" />
@@ -119,7 +119,7 @@ function Hero() {
         />
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
+      <div className="relative z-10 max-w-4xl mx-auto px-6 text-center pt-24 pb-16">
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -154,9 +154,9 @@ function Hero() {
           transition={{ delay: 0.35, duration: 0.6 }}
           className="text-lg md:text-xl text-white/55 max-w-2xl mx-auto mb-10 leading-relaxed"
         >
-          Upload your resume, paste a job description, and RezAI instantly generates a
-          perfectly tailored resume, cover letter, cold email, and LinkedIn profile — optimised
-          for ATS and the human eye.
+          Upload your resume + paste a job description = tailored resume, cover letter,
+          outreach email and LinkedIn rewrite in 2 minutes.{" "}
+          <span className="text-white/75 font-medium">Free. No login needed.</span>
         </motion.p>
 
         {/* CTAs */}
@@ -170,8 +170,8 @@ function Hero() {
             href="/app"
             className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#f0a020] text-[#070c18] font-bold text-base hover:bg-[#f0a020]/90 transition-all duration-200 shadow-xl shadow-[#f0a020]/25 hover:shadow-[#f0a020]/45 hover:-translate-y-1"
           >
-            Build my resume — it's free
-            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            Build my resume free
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
           <a
             href="#how-it-works"
@@ -181,23 +181,27 @@ function Hero() {
           </a>
         </motion.div>
 
-        {/* Social proof */}
+        {/* Stat bar */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7, duration: 0.6 }}
-          className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-white/40"
+          className="mt-10 inline-flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-white/40"
         >
-          {[
-            { icon: <Check className="w-3.5 h-3.5 text-[#f0a020]" />, label: "No credit card required" },
-            { icon: <Check className="w-3.5 h-3.5 text-[#f0a020]" />, label: "PDF & DOCX export" },
-            { icon: <Check className="w-3.5 h-3.5 text-[#f0a020]" />, label: "ATS score analysis" },
-          ].map(({ icon, label }) => (
-            <div key={label} className="flex items-center gap-2">
-              {icon}
-              <span>{label}</span>
-            </div>
-          ))}
+          <span className="flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5 fill-[#f0a020] text-[#f0a020]" />
+            Used by 1,200+ job seekers
+          </span>
+          <span className="hidden sm:block text-white/15">·</span>
+          <span className="flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5 text-[#f0a020]" />
+            Free forever
+          </span>
+          <span className="hidden sm:block text-white/15">·</span>
+          <span className="flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5 text-[#f0a020]" />
+            No login needed
+          </span>
         </motion.div>
       </div>
     </section>
@@ -211,21 +215,21 @@ const steps = [
     icon: <Upload className="w-6 h-6" />,
     title: "Upload your resume",
     description:
-      "Drop your existing resume (PDF), paste your LinkedIn export, or build from scratch using our guided form.",
+      "Drop your existing resume as a PDF, paste your LinkedIn export, or build one from scratch using our guided form. No account needed.",
   },
   {
     number: "02",
     icon: <Target className="w-6 h-6" />,
     title: "Paste the job description",
     description:
-      "Add up to 3 job descriptions at once. RezAI deeply analyses every keyword, requirement, and signal the employer cares about.",
+      "Copy-paste the job description for any role you're targeting. Add up to 3 roles at once and get a separate tailored package for each.",
   },
   {
     number: "03",
     icon: <Download className="w-6 h-6" />,
-    title: "Download & apply",
+    title: "Get your full package in 2 minutes",
     description:
-      "Instantly get a tailored resume, cover letter, cold email, and LinkedIn profile — ready to apply. Download as PDF or Word.",
+      "Instantly receive a tailored resume, cover letter, outreach email, and LinkedIn rewrite — ATS-optimised and ready to send. Download as PDF or Word.",
   },
 ];
 
@@ -362,27 +366,24 @@ function Features() {
 const testimonials = [
   {
     stars: 5,
-    quote:
-      "I'd been applying for 3 months with zero callbacks. After using RezAI to tailor my resume for a senior PM role, I got an interview the same week. The ATS score went from 41 to 89.",
-    name: "Priya Mehta",
-    role: "Senior Product Manager",
-    company: "Hired at a Series B startup",
-  },
-  {
-    stars: 5,
-    quote:
-      "The cold email template it generated was better than anything I could have written. I sent 12 emails, got 4 responses — that's a 33% reply rate. Insane.",
-    name: "James Okoro",
+    quote: "ATS score went from 42 to 87. Got shortlisted in 3 days.",
+    name: "Priya S.",
     role: "Software Engineer",
-    company: "Transitioned from agency to FAANG",
+    location: "Bangalore",
   },
   {
     stars: 5,
-    quote:
-      "I was switching from finance to tech and had no idea how to position myself. RezAI rewrote my entire story — resume, LinkedIn, cover letter — in one session. Got 3 offers.",
-    name: "Sarah Lin",
-    role: "Data Analyst",
-    company: "Career switcher, now at a fintech unicorn",
+    quote: "Used to spend hours rewriting resume. Now takes 2 minutes.",
+    name: "Rahul M.",
+    role: "MBA Graduate",
+    location: "Mumbai",
+  },
+  {
+    stars: 5,
+    quote: "The outreach email feature got me 4 recruiter replies in one week.",
+    name: "Ananya K.",
+    role: "Marketing Manager",
+    location: "Hyderabad",
   },
 ];
 
@@ -425,8 +426,7 @@ function Testimonials() {
                   </div>
                   <div>
                     <p className="text-white font-semibold text-sm">{t.name}</p>
-                    <p className="text-white/40 text-xs">{t.role}</p>
-                    <p className="text-[#f0a020]/70 text-xs">{t.company}</p>
+                    <p className="text-white/40 text-xs">{t.role} · {t.location}</p>
                   </div>
                 </div>
               </div>
@@ -449,23 +449,19 @@ function CTABanner() {
               {/* Glow */}
               <div className="absolute inset-0 rounded-3xl bg-[#f0a020]/5 blur-3xl pointer-events-none" />
               <div className="relative z-10">
-                <div className="inline-flex items-center gap-2 mb-5">
-                  <Shield className="w-5 h-5 text-[#f0a020]" />
-                  <span className="text-[#f0a020] text-sm font-medium">Free to use — no signup required</span>
-                </div>
                 <h2 className="text-4xl md:text-5xl font-bold text-white font-display tracking-tight mb-4">
-                  Your next interview is{" "}
-                  <span className="text-gradient-gold">one resume away</span>
+                  Ready to get{" "}
+                  <span className="text-gradient-gold">more interviews?</span>
                 </h2>
                 <p className="text-white/50 text-lg mb-8 max-w-xl mx-auto">
                   Stop sending generic applications. Let RezAI tailor every word to every role —
-                  in under 60 seconds.
+                  in under 2 minutes.
                 </p>
                 <Link
                   href="/app"
                   className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-[#f0a020] text-[#070c18] font-bold text-base hover:bg-[#f0a020]/90 transition-all duration-200 shadow-xl shadow-[#f0a020]/30 hover:shadow-[#f0a020]/50 hover:-translate-y-1"
                 >
-                  Start for free
+                  Start for free — no login needed
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <div className="mt-6 flex items-center justify-center gap-6 text-sm text-white/35">
