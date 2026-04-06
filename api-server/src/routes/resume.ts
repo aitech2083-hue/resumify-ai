@@ -30,6 +30,7 @@ interface ScratchData {
   education?: Array<{
     degree?: string;
     institution?: string;
+    month?: string;
     year?: string;
   }>;
   certifications?: string;
@@ -88,7 +89,10 @@ function buildScratchText(sd: ScratchData): string {
   if (sd.education && sd.education.length) {
     out += "\nEDUCATION:\n";
     sd.education.forEach((e) => {
-      out += `${e.degree || ""} — ${e.institution || ""} ${e.year ? `(${e.year})` : ""}\n`;
+      const period = e.month && e.year
+        ? `(${e.month} ${e.year})`
+        : e.year ? `(${e.year})` : e.month ? `(${e.month})` : "";
+      out += `${e.degree || ""} — ${e.institution || ""} ${period}\n`.trim() + "\n";
     });
   }
 

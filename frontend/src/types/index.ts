@@ -20,6 +20,7 @@ export interface Education {
   id: string;
   degree: string;
   institution: string;
+  month: string;
   year: string;
 }
 
