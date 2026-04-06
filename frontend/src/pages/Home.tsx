@@ -811,16 +811,16 @@ export default function Home() {
                           {/* Single JD mode */}
                           {!multiJdOpen ? (
                             <div className="space-y-2">
-                              <div className="flex gap-2">
+                              <div className="grid grid-cols-3 gap-2">
                                 <input
                                   type="text" placeholder="Job Title (optional)"
                                   value={jds[0]?.title || ""} onChange={e => { const n = [...jds]; n[0].title = e.target.value; setJds(n); }}
-                                  className="card-input flex-1"
+                                  className="card-input col-span-2"
                                 />
                                 <input
                                   type="text" placeholder="Company name (optional)"
                                   value={jds[0]?.company || ""} onChange={e => { const n = [...jds]; n[0].company = e.target.value; setJds(n); }}
-                                  className="card-input w-1/3"
+                                  className="card-input"
                                 />
                               </div>
                               <textarea
@@ -854,9 +854,9 @@ export default function Home() {
                                 )}
                                 <button onClick={() => { setMultiJdOpen(false); setActiveInputJdIndex(0); }} className="text-xs text-[#4a6080] hover:text-foreground">Single</button>
                               </div>
-                              <div className="flex gap-2">
-                                <input type="text" placeholder="Job Title (optional)" value={jds[activeInputJdIndex]?.title || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].title = e.target.value; setJds(n); }} className="card-input flex-1" />
-                                <input type="text" placeholder="Company name (optional)" value={jds[activeInputJdIndex]?.company || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].company = e.target.value; setJds(n); }} className="card-input w-1/3" />
+                              <div className="grid grid-cols-3 gap-2">
+                                <input type="text" placeholder="Job Title (optional)" value={jds[activeInputJdIndex]?.title || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].title = e.target.value; setJds(n); }} className="card-input col-span-2" />
+                                <input type="text" placeholder="Company name (optional)" value={jds[activeInputJdIndex]?.company || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].company = e.target.value; setJds(n); }} className="card-input" />
                               </div>
                               <textarea placeholder="Paste job description here..." value={jds[activeInputJdIndex]?.text || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].text = e.target.value; setJds(n); }} className="card-textarea min-h-[120px]" />
                               {jds.length > 1 && (
@@ -1009,9 +1009,9 @@ export default function Home() {
                   </div>
                   {showChangingJd ? (
                     <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <input type="text" placeholder="Job Title (optional)" value={jds[activeJdTab]?.title || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], title: e.target.value }; setJds(n); }} className="card-input flex-1 text-xs py-1.5" />
-                        <input type="text" placeholder="Company (optional)" value={jds[activeJdTab]?.company || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], company: e.target.value }; setJds(n); }} className="card-input w-20 text-xs py-1.5" />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="text" placeholder="Job Title (optional)" value={jds[activeJdTab]?.title || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], title: e.target.value }; setJds(n); }} className="card-input col-span-2 text-xs py-1.5" />
+                        <input type="text" placeholder="Company (optional)" value={jds[activeJdTab]?.company || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], company: e.target.value }; setJds(n); }} className="card-input text-xs py-1.5" />
                       </div>
                       <textarea value={jds[activeJdTab]?.text || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], text: e.target.value }; setJds(n); }} className="card-textarea min-h-[80px] text-xs" />
                     </div>
