@@ -34,7 +34,7 @@ const GENERATE_STEPS = [
 const initialScratchData: ScratchData = {
   name: "", email: "", phone: "", location: "", linkedin: "", skills: "",
   experiences: [{ id: uuidv4(), title: "", company: "", duration: "", resp: "" }],
-  education: [{ id: uuidv4(), degree: "", institution: "", year: "" }],
+  education: [{ id: uuidv4(), degree: "", institution: "", month: "", year: "" }],
   certifications: ""
 };
 
@@ -779,15 +779,16 @@ export default function Home() {
                                 <div>
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2 text-xs font-semibold text-primary"><GraduationCap className="w-3.5 h-3.5" /> Education</div>
-                                    <button onClick={() => setScratchData(s => ({ ...s, education: [...s.education, { id: uuidv4(), degree: "", institution: "", year: "" }] }))} className="text-xs text-primary flex items-center gap-0.5 hover:text-primary/80">
+                                    <button onClick={() => setScratchData(s => ({ ...s, education: [...s.education, { id: uuidv4(), degree: "", institution: "", month: "", year: "" }] }))} className="text-xs text-primary flex items-center gap-0.5 hover:text-primary/80">
                                       <Plus className="w-3 h-3" /> Add
                                     </button>
                                   </div>
                                   <div className="space-y-2">
                                     {scratchData.education.map((edu, idx) => (
-                                      <div key={edu.id} className="flex items-center gap-2">
-                                        <input type="text" placeholder="Degree" value={edu.degree} onChange={e => { const n = [...scratchData.education]; n[idx].degree = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs flex-1" />
-                                        <input type="text" placeholder="University" value={edu.institution} onChange={e => { const n = [...scratchData.education]; n[idx].institution = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs flex-1" />
+                                      <div key={edu.id} className="flex items-center gap-2 flex-wrap">
+                                        <input type="text" placeholder="Degree" value={edu.degree} onChange={e => { const n = [...scratchData.education]; n[idx].degree = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs flex-1 min-w-[100px]" />
+                                        <input type="text" placeholder="Institution" value={edu.institution} onChange={e => { const n = [...scratchData.education]; n[idx].institution = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs flex-1 min-w-[100px]" />
+                                        <input type="text" placeholder="Month (optional)" value={edu.month} onChange={e => { const n = [...scratchData.education]; n[idx].month = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs w-28" />
                                         <input type="text" placeholder="Year" value={edu.year} onChange={e => { const n = [...scratchData.education]; n[idx].year = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs w-16" />
                                         {idx > 0 && <button onClick={() => setScratchData(s => ({ ...s, education: s.education.filter(e => e.id !== edu.id) }))} className="p-1 text-[#4a6080] hover:text-destructive flex-shrink-0"><X className="w-3 h-3" /></button>}
                                       </div>
@@ -812,12 +813,12 @@ export default function Home() {
                             <div className="space-y-2">
                               <div className="flex gap-2">
                                 <input
-                                  type="text" placeholder="Job Title"
+                                  type="text" placeholder="Job Title (optional)"
                                   value={jds[0]?.title || ""} onChange={e => { const n = [...jds]; n[0].title = e.target.value; setJds(n); }}
                                   className="card-input flex-1"
                                 />
                                 <input
-                                  type="text" placeholder="Company"
+                                  type="text" placeholder="Company name (optional)"
                                   value={jds[0]?.company || ""} onChange={e => { const n = [...jds]; n[0].company = e.target.value; setJds(n); }}
                                   className="card-input w-1/3"
                                 />
@@ -854,8 +855,8 @@ export default function Home() {
                                 <button onClick={() => { setMultiJdOpen(false); setActiveInputJdIndex(0); }} className="text-xs text-[#4a6080] hover:text-foreground">Single</button>
                               </div>
                               <div className="flex gap-2">
-                                <input type="text" placeholder="Job Title" value={jds[activeInputJdIndex]?.title || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].title = e.target.value; setJds(n); }} className="card-input flex-1" />
-                                <input type="text" placeholder="Company" value={jds[activeInputJdIndex]?.company || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].company = e.target.value; setJds(n); }} className="card-input w-1/3" />
+                                <input type="text" placeholder="Job Title (optional)" value={jds[activeInputJdIndex]?.title || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].title = e.target.value; setJds(n); }} className="card-input flex-1" />
+                                <input type="text" placeholder="Company name (optional)" value={jds[activeInputJdIndex]?.company || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].company = e.target.value; setJds(n); }} className="card-input w-1/3" />
                               </div>
                               <textarea placeholder="Paste job description here..." value={jds[activeInputJdIndex]?.text || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].text = e.target.value; setJds(n); }} className="card-textarea min-h-[120px]" />
                               {jds.length > 1 && (
@@ -1009,8 +1010,8 @@ export default function Home() {
                   {showChangingJd ? (
                     <div className="space-y-2">
                       <div className="flex gap-2">
-                        <input type="text" placeholder="Job Title" value={jds[activeJdTab]?.title || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], title: e.target.value }; setJds(n); }} className="card-input flex-1 text-xs py-1.5" />
-                        <input type="text" placeholder="Company" value={jds[activeJdTab]?.company || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], company: e.target.value }; setJds(n); }} className="card-input w-20 text-xs py-1.5" />
+                        <input type="text" placeholder="Job Title (optional)" value={jds[activeJdTab]?.title || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], title: e.target.value }; setJds(n); }} className="card-input flex-1 text-xs py-1.5" />
+                        <input type="text" placeholder="Company (optional)" value={jds[activeJdTab]?.company || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], company: e.target.value }; setJds(n); }} className="card-input w-20 text-xs py-1.5" />
                       </div>
                       <textarea value={jds[activeJdTab]?.text || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], text: e.target.value }; setJds(n); }} className="card-textarea min-h-[80px] text-xs" />
                     </div>
