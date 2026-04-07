@@ -7,8 +7,9 @@ import {
   Briefcase, GraduationCap, LayoutTemplate,
   History, Eye, ExternalLink, Mail, MessageSquare,
   Download, Loader2, ChevronDown, Upload,
-  RefreshCw, BookOpen
+  RefreshCw, BookOpen, Sun, Moon
 } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 import { cn, copyToClipboard, generateOverleafUrl } from "@/lib/utils";
 import type { Mode, Tone, JD, ScratchData, GenerateResponse, AtsScore } from "@/types";
 import { useGenerateResume } from "@/hooks/use-generate";
@@ -54,6 +55,8 @@ function formatAdditionalExp(exp: AdditionalExp): string {
 }
 
 export default function Home() {
+  const { theme, toggleTheme } = useTheme();
+
   // -- App State --
   const [mode, setMode] = useState<Mode>("upload");
   const [tone, setTone] = useState<Tone>("formal");
@@ -415,7 +418,7 @@ export default function Home() {
               compact ? "max-w-[85%] px-3 py-2.5" : "max-w-[78%] px-4 py-3",
               msg.role === "user"
                 ? "bg-primary text-primary-foreground rounded-tr-sm"
-                : "bg-[#0c1626] border border-[#1e304a] text-foreground/90 rounded-tl-sm"
+                : "bg-[var(--rz-surface)] border border-[var(--rz-border)] text-foreground/90 rounded-tl-sm"
             )}>
               {msg.type === "edit" && (
                 <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-success text-xs font-semibold mb-2">
@@ -432,7 +435,7 @@ export default function Home() {
                 </button>
               )}
               {msg.role === "assistant" && i === 0 && noUserMsgsYet && (
-                <div className="mt-3 pt-3 border-t border-[#1e304a]/60 space-y-2">
+                <div className="mt-3 pt-3 border-t border-[var(--rz-border)]/60 space-y-2">
                   <div className="flex flex-wrap gap-1.5">
                     {AGENT_CHIPS_ROW1.map(chip => (
                       <button key={chip} onClick={() => sendAgentMessage(chip)} disabled={loading}
@@ -459,7 +462,7 @@ export default function Home() {
             <div className="w-7 h-7 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center border border-primary/30">
               <Zap className="w-3.5 h-3.5 text-primary fill-current" />
             </div>
-            <div className="bg-[#0c1626] border border-[#1e304a] px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
+            <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
               {[0, 0.2, 0.4].map((delay, k) => (
                 <span key={k} className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${delay}s` }} />
               ))}
@@ -491,27 +494,34 @@ export default function Home() {
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen bg-[#070c18] text-[#e2ddd4] overflow-hidden">
+    <div className="flex flex-col h-screen bg-[var(--rz-bg)] text-[var(--rz-text)] overflow-hidden">
 
       {/* ── SLIM NAV (48px) ── */}
-      <nav className="flex-shrink-0 h-12 px-5 flex items-center justify-between border-b border-[#1e304a] bg-[#0c1626]/90 backdrop-blur-sm z-30">
+      <nav className="flex-shrink-0 h-12 px-5 flex items-center justify-between border-b border-[var(--rz-border)] bg-[var(--rz-surface)]/90 backdrop-blur-sm z-30">
         {/* Logo */}
         <a href="/app" className="flex items-center gap-2 group">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-[#c77a10] flex items-center justify-center shadow-[0_0_12px_rgba(240,160,32,0.3)]">
-            <Zap className="w-4 h-4 text-[#070c18] fill-current" />
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-[var(--rz-accent-hover)] flex items-center justify-center shadow-[0_0_12px_rgba(240,160,32,0.3)]">
+            <Zap className="w-4 h-4 text-[var(--rz-accent-text)] fill-current" />
           </div>
           <span className="font-bold text-sm tracking-wide text-foreground">RezAI</span>
         </a>
 
         {/* Right links */}
         <div className="flex items-center gap-5">
-          <button className="text-xs text-[#4a6080] hover:text-foreground transition-colors flex items-center gap-1.5">
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            className="w-8 h-8 rounded-full flex items-center justify-center border border-[var(--rz-border)] bg-[var(--rz-bg)] text-[var(--rz-muted)] hover:text-foreground hover:border-[var(--rz-muted)] transition-colors"
+          >
+            {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </button>
+          <button className="text-xs text-[var(--rz-muted)] hover:text-foreground transition-colors flex items-center gap-1.5">
             <span>📋</span> Job Tracker
           </button>
           <button
             onClick={() => result ? setActiveFeatureTab("history") : setShowHistoryOverlay(v => !v)}
             className={cn("text-xs transition-colors flex items-center gap-1.5",
-              (activeFeatureTab === "history" || showHistoryOverlay) ? "text-primary" : "text-[#4a6080] hover:text-foreground"
+              (activeFeatureTab === "history" || showHistoryOverlay) ? "text-primary" : "text-[var(--rz-muted)] hover:text-foreground"
             )}
           >
             <History className="w-3.5 h-3.5" /> History
@@ -544,26 +554,26 @@ export default function Home() {
             >
               {/* History overlay */}
               {showHistoryOverlay && (
-                <div className="fixed inset-0 z-50 bg-[#070c18]/80 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowHistoryOverlay(false)}>
-                  <div className="w-full max-w-lg bg-[#0c1626] border border-[#1e304a] rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-[#1e304a]">
+                <div className="fixed inset-0 z-50 bg-[var(--rz-bg)]/80 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setShowHistoryOverlay(false)}>
+                  <div className="w-full max-w-lg bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--rz-border)]">
                       <h3 className="font-semibold text-foreground flex items-center gap-2"><History className="w-4 h-4 text-primary" /> Generation History</h3>
-                      <button onClick={() => setShowHistoryOverlay(false)} className="p-1.5 text-[#4a6080] hover:text-foreground rounded-lg hover:bg-white/5">
+                      <button onClick={() => setShowHistoryOverlay(false)} className="p-1.5 text-[var(--rz-muted)] hover:text-foreground rounded-lg hover:bg-white/5">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                     <div className="max-h-[60vh] overflow-y-auto p-4 space-y-3 custom-scrollbar">
                       {history.length === 0 ? (
-                        <p className="text-[#4a6080] text-sm text-center py-8">No history yet.</p>
+                        <p className="text-[var(--rz-muted)] text-sm text-center py-8">No history yet.</p>
                       ) : history.map(item => (
-                        <div key={item.id} className="bg-[#070c18] border border-[#1e304a] rounded-xl p-4 hover:border-primary/40 transition-colors group">
+                        <div key={item.id} className="bg-[var(--rz-bg)] border border-[var(--rz-border)] rounded-xl p-4 hover:border-primary/40 transition-colors group">
                           <div className="flex justify-between items-start mb-2">
-                            <div className="text-xs text-[#4a6080]">{new Date(item.date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>
+                            <div className="text-xs text-[var(--rz-muted)]">{new Date(item.date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>
                             <div className="flex gap-2">
-                              <button onClick={() => loadHistoryItem(item)} className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary hover:text-[#070c18] transition-colors flex items-center gap-1">
+                              <button onClick={() => loadHistoryItem(item)} className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary hover:text-[var(--rz-accent-text)] transition-colors flex items-center gap-1">
                                 <Eye className="w-3 h-3" /> Load
                               </button>
-                              <button onClick={() => deleteHistory(item.id)} className="p-1 text-[#4a6080] hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => deleteHistory(item.id)} className="p-1 text-[var(--rz-muted)] hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Trash2 className="w-3 h-3" />
                               </button>
                             </div>
@@ -571,15 +581,15 @@ export default function Home() {
                           {item.jds.map((jd, i) => (
                             <div key={i} className="text-sm text-foreground/80 flex items-center gap-1.5">
                               <span className="w-1 h-1 rounded-full bg-primary/50" />
-                              {jd.title || "Untitled"} <span className="text-[#4a6080]">at</span> {jd.company || "Unknown"}
+                              {jd.title || "Untitled"} <span className="text-[var(--rz-muted)]">at</span> {jd.company || "Unknown"}
                             </div>
                           ))}
                         </div>
                       ))}
                     </div>
                     {history.length > 0 && (
-                      <div className="px-6 py-3 border-t border-[#1e304a]">
-                        <button onClick={() => { if (confirm("Clear all history?")) { clearHistory(); } }} className="text-xs text-[#4a6080] hover:text-destructive transition-colors">Clear all history</button>
+                      <div className="px-6 py-3 border-t border-[var(--rz-border)]">
+                        <button onClick={() => { if (confirm("Clear all history?")) { clearHistory(); } }} className="text-xs text-[var(--rz-muted)] hover:text-destructive transition-colors">Clear all history</button>
                       </div>
                     )}
                   </div>
@@ -594,12 +604,12 @@ export default function Home() {
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-[#0c1626] border border-[#1e304a] rounded-2xl overflow-hidden shadow-2xl"
+                      className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-2xl overflow-hidden shadow-2xl"
                     >
                       {/* Amber progress bar */}
                       <div className="h-1 bg-[#1e304a] relative overflow-hidden">
                         <motion.div
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-[#c77a10]"
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)]"
                           animate={{ width: `${((generateStep + 1) / 4) * 100}%` }}
                           transition={{ duration: 0.8, ease: "easeOut" }}
                         />
@@ -608,14 +618,14 @@ export default function Home() {
                         {/* Pulsing logo */}
                         <div className="flex justify-center mb-6">
                           <div className="relative">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-[#c77a10] flex items-center justify-center shadow-[0_0_40px_rgba(240,160,32,0.4)]">
-                              <Zap className="w-8 h-8 text-[#070c18] fill-current" />
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-[var(--rz-accent-hover)] flex items-center justify-center shadow-[0_0_40px_rgba(240,160,32,0.4)]">
+                              <Zap className="w-8 h-8 text-[var(--rz-accent-text)] fill-current" />
                             </div>
                             <span className="absolute inset-0 rounded-2xl bg-primary/30 animate-ping" style={{ animationDuration: "1.8s" }} />
                           </div>
                         </div>
                         <h2 className="text-center font-bold text-lg text-foreground mb-1">RezAI is crafting your package...</h2>
-                        <p className="text-center text-sm text-[#4a6080] mb-8">This usually takes 30–45 seconds</p>
+                        <p className="text-center text-sm text-[var(--rz-muted)] mb-8">This usually takes 30–45 seconds</p>
                         {/* Steps */}
                         <div className="space-y-3 max-w-xs mx-auto">
                           {GENERATE_STEPS.map((step, i) => (
@@ -629,17 +639,17 @@ export default function Home() {
                                 "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500",
                                 i < generateStep ? "bg-success border border-success/30" :
                                 i === generateStep ? "bg-primary border border-primary/30 shadow-[0_0_8px_rgba(240,160,32,0.5)]" :
-                                "bg-[#0c1626] border border-[#1e304a]"
+                                "bg-[var(--rz-surface)] border border-[var(--rz-border)]"
                               )}>
                                 {i < generateStep ? (
-                                  <Check className="w-3 h-3 text-[#070c18]" />
+                                  <Check className="w-3 h-3 text-[var(--rz-accent-text)]" />
                                 ) : i === generateStep ? (
-                                  <Loader2 className="w-3 h-3 text-[#070c18] animate-spin" />
+                                  <Loader2 className="w-3 h-3 text-[var(--rz-accent-text)] animate-spin" />
                                 ) : (
                                   <span className="w-1.5 h-1.5 rounded-full bg-[#1e304a]" />
                                 )}
                               </div>
-                              <span className={cn("text-sm transition-colors", i <= generateStep ? "text-foreground" : "text-[#4a6080]")}>{step}</span>
+                              <span className={cn("text-sm transition-colors", i <= generateStep ? "text-foreground" : "text-[var(--rz-muted)]")}>{step}</span>
                             </motion.div>
                           ))}
                         </div>
@@ -651,13 +661,13 @@ export default function Home() {
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-[#0c1626] border border-[#1e304a] rounded-2xl shadow-2xl overflow-hidden"
+                      className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-2xl shadow-2xl overflow-hidden"
                     >
                       {/* Card header */}
-                      <div className="px-6 pt-6 pb-4 border-b border-[#1e304a]/60">
+                      <div className="px-6 pt-6 pb-4 border-b border-[var(--rz-border)]/60">
                         <div className="flex items-center gap-2 mb-1">
                           <Zap className="w-4 h-4 text-primary fill-current" />
-                          <span className="text-xs font-bold tracking-widest uppercase text-[#4a6080]">RezAI — AI Resume Builder</span>
+                          <span className="text-xs font-bold tracking-widest uppercase text-[var(--rz-muted)]">RezAI — AI Resume Builder</span>
                         </div>
                         <h1 className="text-xl font-bold text-foreground">Build your resume package</h1>
                       </div>
@@ -666,8 +676,8 @@ export default function Home() {
 
                         {/* Mode selector */}
                         <div>
-                          <label className="text-[10px] font-bold tracking-widest uppercase text-[#4a6080] mb-2 block">Resume Source</label>
-                          <div className="flex bg-[#070c18] p-1 rounded-xl border border-[#1e304a] gap-1">
+                          <label className="text-[10px] font-bold tracking-widest uppercase text-[var(--rz-muted)] mb-2 block">Resume Source</label>
+                          <div className="flex bg-[var(--rz-bg)] p-1 rounded-xl border border-[var(--rz-border)] gap-1">
                             {([
                               { id: "upload", label: "Upload", emoji: "📄" },
                               { id: "linkedin", label: "LinkedIn", emoji: "💼" },
@@ -679,8 +689,8 @@ export default function Home() {
                                 className={cn(
                                   "flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5",
                                   mode === m.id
-                                    ? "bg-primary text-[#070c18] shadow-sm"
-                                    : "text-[#4a6080] hover:text-foreground hover:bg-[#0c1626]"
+                                    ? "bg-primary text-[var(--rz-accent-text)] shadow-sm"
+                                    : "text-[var(--rz-muted)] hover:text-foreground hover:bg-[var(--rz-surface)]"
                                 )}
                               >
                                 <span>{m.emoji}</span> {m.label}
@@ -707,7 +717,7 @@ export default function Home() {
                                   onFileSelect={setResumeFile}
                                   label="Drop your resume here or click to upload"
                                   sublabel="PDF or TXT supported"
-                                  icon={<Upload className="w-5 h-5 text-[#4a6080]" />}
+                                  icon={<Upload className="w-5 h-5 text-[var(--rz-muted)]" />}
                                 />
                                 {/* Collapsible extra exp */}
                                 <button
@@ -725,7 +735,7 @@ export default function Home() {
                                       exit={{ opacity: 0, height: 0 }}
                                       className="overflow-hidden"
                                     >
-                                      <div className="p-3 bg-[#070c18] border border-[#1e304a] rounded-xl space-y-2">
+                                      <div className="p-3 bg-[var(--rz-bg)] border border-[var(--rz-border)] rounded-xl space-y-2">
                                         <input type="text" placeholder="Company name" value={extraUploadExp.company} onChange={e => setExtraUploadExp(s => ({ ...s, company: e.target.value }))} className="card-input" />
                                         <input type="text" placeholder="Your role / position" value={extraUploadExp.role} onChange={e => setExtraUploadExp(s => ({ ...s, role: e.target.value }))} className="card-input" />
                                         <div className="flex gap-2">
@@ -753,14 +763,14 @@ export default function Home() {
                                       "rounded-xl p-3 text-left transition-all border",
                                       linkedinImportType === "url"
                                         ? "border-primary bg-primary/10"
-                                        : "border-[#1e304a] bg-[#070c18] hover:border-[#2a3f5a]"
+                                        : "border-[var(--rz-border)] bg-[var(--rz-bg)] hover:border-[#2a3f5a]"
                                     )}
                                   >
                                     <div className="text-sm mb-1">🔗 Paste URL</div>
                                     <div className={cn("text-[10px] font-bold rounded-full px-1.5 py-0.5 inline-block mb-1.5",
-                                      linkedinImportType === "url" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[#4a6080]"
+                                      linkedinImportType === "url" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[var(--rz-muted)]"
                                     )}>Recommended · Automatic</div>
-                                    <div className="text-[11px] text-[#4a6080] leading-snug">Paste your LinkedIn URL and we import everything instantly</div>
+                                    <div className="text-[11px] text-[var(--rz-muted)] leading-snug">Paste your LinkedIn URL and we import everything instantly</div>
                                   </button>
                                   {/* PDF card */}
                                   <button
@@ -770,14 +780,14 @@ export default function Home() {
                                       "rounded-xl p-3 text-left transition-all border",
                                       linkedinImportType === "pdf"
                                         ? "border-primary bg-primary/10"
-                                        : "border-[#1e304a] bg-[#070c18] hover:border-[#2a3f5a]"
+                                        : "border-[var(--rz-border)] bg-[var(--rz-bg)] hover:border-[#2a3f5a]"
                                     )}
                                   >
                                     <div className="text-sm mb-1">📄 Upload PDF</div>
                                     <div className={cn("text-[10px] font-bold rounded-full px-1.5 py-0.5 inline-block mb-1.5",
-                                      linkedinImportType === "pdf" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[#4a6080]"
+                                      linkedinImportType === "pdf" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[var(--rz-muted)]"
                                     )}>Manual</div>
-                                    <div className="text-[11px] text-[#4a6080] leading-snug">Export PDF from LinkedIn settings and upload here</div>
+                                    <div className="text-[11px] text-[var(--rz-muted)] leading-snug">Export PDF from LinkedIn settings and upload here</div>
                                   </button>
                                 </div>
 
@@ -785,7 +795,7 @@ export default function Home() {
                                 {linkedinImportType === "url" && (
                                   <div className="space-y-3">
                                     <div>
-                                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] block mb-1.5">Your LinkedIn profile URL</label>
+                                      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] block mb-1.5">Your LinkedIn profile URL</label>
                                       <input
                                         type="url"
                                         placeholder="https://linkedin.com/in/yourname"
@@ -795,7 +805,7 @@ export default function Home() {
                                         className="card-input"
                                         disabled={linkedinImporting || !!linkedinProfile}
                                       />
-                                      <div className="text-[10px] text-[#4a6080] mt-1">Must be a public profile</div>
+                                      <div className="text-[10px] text-[var(--rz-muted)] mt-1">Must be a public profile</div>
                                     </div>
 
                                     {/* Error */}
@@ -809,7 +819,7 @@ export default function Home() {
                                     {linkedinImporting && (
                                       <div className="flex flex-col items-center gap-2 py-4">
                                         <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                                        <div className="text-xs text-[#4a6080] text-center">Importing your profile...<br />this takes 15–30 seconds</div>
+                                        <div className="text-xs text-[var(--rz-muted)] text-center">Importing your profile...<br />this takes 15–30 seconds</div>
                                       </div>
                                     )}
 
@@ -823,22 +833,22 @@ export default function Home() {
                                           <button
                                             type="button"
                                             onClick={() => { setLinkedinProfile(null); setLinkedinUrl(""); setLinkedinImportError(null); }}
-                                            className="text-[10px] text-[#4a6080] hover:text-foreground transition-colors"
+                                            className="text-[10px] text-[var(--rz-muted)] hover:text-foreground transition-colors"
                                           >Clear & retry</button>
                                         </div>
                                         {linkedinProfile.name && <div className="text-sm font-semibold text-foreground">{linkedinProfile.name}</div>}
                                         {(linkedinProfile.headline || linkedinProfile.location) && (
-                                          <div className="text-xs text-[#4a6080]">
+                                          <div className="text-xs text-[var(--rz-muted)]">
                                             {[linkedinProfile.headline, linkedinProfile.location].filter(Boolean).join(" · ")}
                                           </div>
                                         )}
-                                        <div className="text-xs text-[#4a6080]">
+                                        <div className="text-xs text-[var(--rz-muted)]">
                                           {linkedinProfile.experience?.length ?? 0} roles · {linkedinProfile.skills?.length ?? 0} skills found
                                         </div>
                                         {/* Email fallback if missing */}
                                         {!linkedinProfile.email && (
                                           <div className="pt-2 border-t border-success/15">
-                                            <div className="text-[10px] text-[#4a6080] mb-1">📧 Email not found on profile</div>
+                                            <div className="text-[10px] text-[var(--rz-muted)] mb-1">📧 Email not found on profile</div>
                                             <input
                                               type="email"
                                               placeholder="Enter your email (optional)"
@@ -856,7 +866,7 @@ export default function Home() {
                                         type="button"
                                         onClick={handleLinkedInImport}
                                         disabled={!linkedinUrl.trim()}
-                                        className="w-full py-2.5 rounded-xl bg-primary text-[#070c18] text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="w-full py-2.5 rounded-xl bg-primary text-[var(--rz-accent-text)] text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                       >
                                         <Zap className="w-4 h-4 fill-current" /> Import Profile
                                       </button>
@@ -875,7 +885,7 @@ export default function Home() {
                                         <AnimatePresence>
                                           {showLinkedinExtra && (
                                             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                                              <div className="p-3 bg-[#070c18] border border-[#1e304a] rounded-xl space-y-2">
+                                              <div className="p-3 bg-[var(--rz-bg)] border border-[var(--rz-border)] rounded-xl space-y-2">
                                                 <input type="text" placeholder="Company name" value={extraLinkedinExp.company} onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))} className="card-input" />
                                                 <input type="text" placeholder="Your role / position" value={extraLinkedinExp.role} onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))} className="card-input" />
                                                 <div className="flex gap-2">
@@ -904,7 +914,7 @@ export default function Home() {
                                       ].map((step, i) => (
                                         <div key={i} className="flex items-start gap-2 mt-1.5">
                                           <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-                                          <span className="text-xs text-[#4a6080]">{step}</span>
+                                          <span className="text-xs text-[var(--rz-muted)]">{step}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -925,7 +935,7 @@ export default function Home() {
                                     <AnimatePresence>
                                       {showLinkedinExtra && (
                                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                                          <div className="p-3 bg-[#070c18] border border-[#1e304a] rounded-xl space-y-2">
+                                          <div className="p-3 bg-[var(--rz-bg)] border border-[var(--rz-border)] rounded-xl space-y-2">
                                             <input type="text" placeholder="Company name" value={extraLinkedinExp.company} onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))} className="card-input" />
                                             <input type="text" placeholder="Your role / position" value={extraLinkedinExp.role} onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))} className="card-input" />
                                             <div className="flex gap-2">
@@ -956,7 +966,7 @@ export default function Home() {
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] mb-1.5 block">Skills</label>
+                                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] mb-1.5 block">Skills</label>
                                   <textarea value={scratchData.skills} onChange={e => setScratchData(s => ({ ...s, skills: e.target.value }))} placeholder="Python, SQL, Management, Agile..." className="card-textarea" />
                                 </div>
                                 <div>
@@ -968,9 +978,9 @@ export default function Home() {
                                   </div>
                                   <div className="space-y-2">
                                     {scratchData.experiences.map((exp, idx) => (
-                                      <div key={exp.id} className="p-3 bg-[#070c18] border border-[#1e304a] rounded-xl relative group">
+                                      <div key={exp.id} className="p-3 bg-[var(--rz-bg)] border border-[var(--rz-border)] rounded-xl relative group">
                                         {idx > 0 && (
-                                          <button onClick={() => setScratchData(s => ({ ...s, experiences: s.experiences.filter(e => e.id !== exp.id) }))} className="absolute top-2 right-2 p-1 text-[#4a6080] hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button onClick={() => setScratchData(s => ({ ...s, experiences: s.experiences.filter(e => e.id !== exp.id) }))} className="absolute top-2 right-2 p-1 text-[var(--rz-muted)] hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
                                             <Trash2 className="w-3 h-3" />
                                           </button>
                                         )}
@@ -998,13 +1008,13 @@ export default function Home() {
                                         <input type="text" placeholder="Institution" value={edu.institution} onChange={e => { const n = [...scratchData.education]; n[idx].institution = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs flex-1 min-w-[100px]" />
                                         <input type="text" placeholder="Month (optional)" value={edu.month} onChange={e => { const n = [...scratchData.education]; n[idx].month = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs w-28" />
                                         <input type="text" placeholder="Year" value={edu.year} onChange={e => { const n = [...scratchData.education]; n[idx].year = e.target.value; setScratchData(s => ({ ...s, education: n })); }} className="card-input py-1.5 text-xs w-16" />
-                                        {idx > 0 && <button onClick={() => setScratchData(s => ({ ...s, education: s.education.filter(e => e.id !== edu.id) }))} className="p-1 text-[#4a6080] hover:text-destructive flex-shrink-0"><X className="w-3 h-3" /></button>}
+                                        {idx > 0 && <button onClick={() => setScratchData(s => ({ ...s, education: s.education.filter(e => e.id !== edu.id) }))} className="p-1 text-[var(--rz-muted)] hover:text-destructive flex-shrink-0"><X className="w-3 h-3" /></button>}
                                       </div>
                                     ))}
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] mb-1.5 block">Certifications & Notes</label>
+                                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] mb-1.5 block">Certifications & Notes</label>
                                   <textarea value={extraScratchNotes} onChange={e => setExtraScratchNotes(e.target.value)} placeholder="AWS Certified, Published author..." className="card-textarea" />
                                 </div>
                               </div>
@@ -1013,8 +1023,8 @@ export default function Home() {
                         </AnimatePresence>
 
                         {/* ── JD SECTION ── */}
-                        <div className="pt-2 border-t border-[#1e304a]/60">
-                          <label className="text-[10px] font-bold tracking-widest uppercase text-[#4a6080] mb-3 block">Job Description</label>
+                        <div className="pt-2 border-t border-[var(--rz-border)]/60">
+                          <label className="text-[10px] font-bold tracking-widest uppercase text-[var(--rz-muted)] mb-3 block">Job Description</label>
 
                           {/* Single JD mode */}
                           {!multiJdOpen ? (
@@ -1045,11 +1055,11 @@ export default function Home() {
                             /* Multi JD mode */
                             <div className="space-y-3">
                               <div className="flex items-center gap-2">
-                                <div className="flex bg-[#070c18] p-1 rounded-lg border border-[#1e304a] gap-1 flex-1">
+                                <div className="flex bg-[var(--rz-bg)] p-1 rounded-lg border border-[var(--rz-border)] gap-1 flex-1">
                                   {jds.map((jd, i) => (
                                     <button key={jd.id} onClick={() => setActiveInputJdIndex(i)}
                                       className={cn("flex-1 py-1.5 rounded-md text-xs font-semibold transition-all",
-                                        activeInputJdIndex === i ? "bg-primary text-[#070c18]" : "text-[#4a6080] hover:text-foreground")}>
+                                        activeInputJdIndex === i ? "bg-primary text-[var(--rz-accent-text)]" : "text-[var(--rz-muted)] hover:text-foreground")}>
                                       {jd.company || `JD ${i + 1}`}
                                     </button>
                                   ))}
@@ -1060,7 +1070,7 @@ export default function Home() {
                                     <Plus className="w-3 h-3" /> Add
                                   </button>
                                 )}
-                                <button onClick={() => { setMultiJdOpen(false); setActiveInputJdIndex(0); }} className="text-xs text-[#4a6080] hover:text-foreground">Single</button>
+                                <button onClick={() => { setMultiJdOpen(false); setActiveInputJdIndex(0); }} className="text-xs text-[var(--rz-muted)] hover:text-foreground">Single</button>
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
                                 <input type="text" placeholder="Job Title (optional)" value={jds[activeInputJdIndex]?.title || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].title = e.target.value; setJds(n); }} className="card-input" />
@@ -1068,7 +1078,7 @@ export default function Home() {
                               </div>
                               <textarea placeholder="Paste job description here..." value={jds[activeInputJdIndex]?.text || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].text = e.target.value; setJds(n); }} className="card-textarea min-h-[120px]" />
                               {jds.length > 1 && (
-                                <button onClick={() => { const n = jds.filter((_, i) => i !== activeInputJdIndex); setJds(n); setActiveInputJdIndex(Math.max(0, activeInputJdIndex - 1)); }} className="text-xs text-[#4a6080] hover:text-destructive flex items-center gap-1">
+                                <button onClick={() => { const n = jds.filter((_, i) => i !== activeInputJdIndex); setJds(n); setActiveInputJdIndex(Math.max(0, activeInputJdIndex - 1)); }} className="text-xs text-[var(--rz-muted)] hover:text-destructive flex items-center gap-1">
                                   <Trash2 className="w-3 h-3" /> Remove this JD
                                 </button>
                               )}
@@ -1077,12 +1087,12 @@ export default function Home() {
                         </div>
 
                         {/* Tone selector */}
-                        <div className="pt-1 border-t border-[#1e304a]/60">
-                          <label className="text-[10px] font-bold tracking-widest uppercase text-[#4a6080] mb-2 block">Outreach Tone</label>
+                        <div className="pt-1 border-t border-[var(--rz-border)]/60">
+                          <label className="text-[10px] font-bold tracking-widest uppercase text-[var(--rz-muted)] mb-2 block">Outreach Tone</label>
                           <div className="flex gap-2">
                             {(["formal", "warm", "concise"] as Tone[]).map(t => (
                               <button key={t} onClick={() => setTone(t)} className={cn("flex-1 py-2 rounded-lg border text-xs font-semibold transition-all capitalize",
-                                tone === t ? "bg-primary/10 border-primary text-primary" : "bg-[#070c18] border-[#1e304a] text-[#4a6080] hover:border-primary/40 hover:text-foreground")}>
+                                tone === t ? "bg-primary/10 border-primary text-primary" : "bg-[var(--rz-bg)] border-[var(--rz-border)] text-[var(--rz-muted)] hover:border-primary/40 hover:text-foreground")}>
                                 {t}
                               </button>
                             ))}
@@ -1101,11 +1111,11 @@ export default function Home() {
                         <button
                           onClick={handleGenerate}
                           disabled={generateMut.isPending}
-                          className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-primary to-[#c77a10] text-[#070c18] hover:shadow-[0_0_30px_rgba(240,160,32,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                          className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] hover:shadow-[0_0_30px_rgba(240,160,32,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                         >
                           <Zap className="w-5 h-5 fill-current" /> ⚡ Generate Package
                         </button>
-                        <p className="text-center text-xs text-[#4a6080]">Usually takes 30–45 seconds · Free forever</p>
+                        <p className="text-center text-xs text-[var(--rz-muted)]">Usually takes 30–45 seconds · Free forever</p>
                       </div>
                     </motion.div>
                   )}{/* end input/generating card */}
@@ -1129,13 +1139,13 @@ export default function Home() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
-                className="w-[280px] flex-shrink-0 flex flex-col border-r border-[#1e304a] bg-[#0c1626] overflow-y-auto custom-scrollbar"
+                className="w-[280px] flex-shrink-0 flex flex-col border-r border-[var(--rz-border)] bg-[var(--rz-surface)] overflow-y-auto custom-scrollbar"
               >
                 {/* Package ready */}
-                <div className="px-4 py-4 border-b border-[#1e304a]">
+                <div className="px-4 py-4 border-b border-[var(--rz-border)]">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <Zap className="w-3.5 h-3.5 text-primary fill-current" />
-                    <span className="text-[10px] font-bold tracking-widest uppercase text-[#4a6080]">RezAI</span>
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-[var(--rz-muted)]">RezAI</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="relative flex h-2.5 w-2.5">
@@ -1147,9 +1157,9 @@ export default function Home() {
                 </div>
 
                 {/* Resume source */}
-                <div className="px-4 py-3 border-b border-[#1e304a]">
+                <div className="px-4 py-3 border-b border-[var(--rz-border)]">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080]">Source</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)]">Source</span>
                     <button onClick={handleStartOver} className="text-[10px] text-primary hover:text-primary/80 transition-colors font-medium">Edit</button>
                   </div>
                   <div className="text-xs text-foreground/70 truncate">
@@ -1159,18 +1169,18 @@ export default function Home() {
                       : mode === "scratch" ? `${scratchData.name || "Scratch"} — built manually`
                       : "Resume uploaded"}
                   </div>
-                  <div className="text-[10px] text-[#4a6080] mt-0.5 capitalize">{mode} mode · {tone} tone</div>
+                  <div className="text-[10px] text-[var(--rz-muted)] mt-0.5 capitalize">{mode} mode · {tone} tone</div>
                 </div>
 
                 {/* JD Tabs */}
                 {result.results.length > 1 && (
-                  <div className="px-4 py-3 border-b border-[#1e304a]">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] block mb-2">Jobs</span>
+                  <div className="px-4 py-3 border-b border-[var(--rz-border)]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] block mb-2">Jobs</span>
                     <div className="flex flex-wrap gap-1.5">
                       {result.results.map((r, i) => (
                         <button key={i} onClick={() => setActiveJdTab(i)}
                           className={cn("px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
-                            activeJdTab === i ? "bg-primary text-[#070c18]" : "bg-[#070c18] border border-[#1e304a] text-[#4a6080] hover:text-foreground hover:border-primary/40")}>
+                            activeJdTab === i ? "bg-primary text-[var(--rz-accent-text)]" : "bg-[var(--rz-bg)] border border-[var(--rz-border)] text-[var(--rz-muted)] hover:text-foreground hover:border-primary/40")}>
                           {r.company || `JD ${i + 1}`}
                         </button>
                       ))}
@@ -1180,20 +1190,20 @@ export default function Home() {
 
                 {/* Single JD: show company + title */}
                 {result.results.length === 1 && (
-                  <div className="px-4 py-3 border-b border-[#1e304a]">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] block mb-0.5">Target Role</span>
+                  <div className="px-4 py-3 border-b border-[var(--rz-border)]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] block mb-0.5">Target Role</span>
                     <div className="text-sm font-medium text-foreground">{result.results[0].jobTitle || jds[0]?.title || "—"}</div>
-                    <div className="text-xs text-[#4a6080]">{result.results[0].company || jds[0]?.company || "—"}</div>
+                    <div className="text-xs text-[var(--rz-muted)]">{result.results[0].company || jds[0]?.company || "—"}</div>
                   </div>
                 )}
 
                 {/* ATS Score badge */}
-                <div className="px-4 py-3 border-b border-[#1e304a]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] block mb-2">ATS Score</span>
+                <div className="px-4 py-3 border-b border-[var(--rz-border)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] block mb-2">ATS Score</span>
                   <div className="flex items-center gap-3">
                     <div className="text-center">
-                      <div className="text-lg font-mono font-bold text-[#4a6080]">{result.results[activeJdTab]?.atsOriginal?.score ?? "—"}</div>
-                      <div className="text-[10px] text-[#4a6080]">Before</div>
+                      <div className="text-lg font-mono font-bold text-[var(--rz-muted)]">{result.results[activeJdTab]?.atsOriginal?.score ?? "—"}</div>
+                      <div className="text-[10px] text-[var(--rz-muted)]">Before</div>
                     </div>
                     <ChevronRight className="w-4 h-4 text-primary" />
                     <div className="text-center">
@@ -1209,9 +1219,9 @@ export default function Home() {
                 </div>
 
                 {/* Current JD preview */}
-                <div className="px-4 py-3 border-b border-[#1e304a]">
+                <div className="px-4 py-3 border-b border-[var(--rz-border)]">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080]">Job Description</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)]">Job Description</span>
                     <button onClick={() => setShowChangingJd(v => !v)} className="text-[10px] text-primary hover:text-primary/80 font-medium transition-colors">
                       {showChangingJd ? "Done" : "Change"}
                     </button>
@@ -1225,17 +1235,17 @@ export default function Home() {
                       <textarea value={jds[activeJdTab]?.text || ""} onChange={e => { const n = [...jds]; n[activeJdTab] = { ...n[activeJdTab], text: e.target.value }; setJds(n); }} className="card-textarea min-h-[80px] text-xs" />
                     </div>
                   ) : (
-                    <p className="text-xs text-[#4a6080] line-clamp-3 leading-relaxed">
+                    <p className="text-xs text-[var(--rz-muted)] line-clamp-3 leading-relaxed">
                       {jds[activeJdTab]?.text || "No job description."}
                     </p>
                   )}
                 </div>
 
                 {/* Additional experience (collapsible) */}
-                <div className="px-4 py-3 border-b border-[#1e304a]">
+                <div className="px-4 py-3 border-b border-[var(--rz-border)]">
                   <button onClick={() => setShowSidebarExtra(v => !v)} className="flex items-center justify-between w-full">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080]">Additional Experience</span>
-                    <ChevronDown className={cn("w-3 h-3 text-[#4a6080] transition-transform", showSidebarExtra && "rotate-180")} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)]">Additional Experience</span>
+                    <ChevronDown className={cn("w-3 h-3 text-[var(--rz-muted)] transition-transform", showSidebarExtra && "rotate-180")} />
                   </button>
                   <AnimatePresence>
                     {showSidebarExtra && (
@@ -1258,16 +1268,16 @@ export default function Home() {
                 <div className="flex-1" />
 
                 {/* Regenerate + Start over */}
-                <div className="px-4 py-4 border-t border-[#1e304a] space-y-2">
+                <div className="px-4 py-4 border-t border-[var(--rz-border)] space-y-2">
                   <button
                     onClick={handleGenerate}
                     disabled={generateMut.isPending}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-[#c77a10] text-[#070c18] font-bold text-sm flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(240,160,32,0.35)] transition-all disabled:opacity-60"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] font-bold text-sm flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(240,160,32,0.35)] transition-all disabled:opacity-60"
                   >
                     {generateMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     Regenerate ⚡
                   </button>
-                  <button onClick={handleStartOver} className="w-full text-center text-xs text-[#4a6080] hover:text-foreground transition-colors py-1">
+                  <button onClick={handleStartOver} className="w-full text-center text-xs text-[var(--rz-muted)] hover:text-foreground transition-colors py-1">
                     Start over
                   </button>
                 </div>
@@ -1279,13 +1289,13 @@ export default function Home() {
                       {["Saved", "Applied", "Interviewing"].map(stage => (
                         <button key={stage} onClick={() => setJobTrackerStage(stage)}
                           className={cn("flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all border",
-                            jobTrackerStage === stage ? "bg-primary/15 border-primary text-primary" : "border-[#1e304a] text-[#4a6080] hover:border-primary/30 hover:text-foreground")}>
+                            jobTrackerStage === stage ? "bg-primary/15 border-primary text-primary" : "border-[var(--rz-border)] text-[var(--rz-muted)] hover:border-primary/30 hover:text-foreground")}>
                           {stage}
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <button onClick={() => setJobTrackerStage("Saved")} className="w-full py-2.5 rounded-xl border border-[#1e304a] text-xs font-semibold text-[#4a6080] hover:text-foreground hover:border-primary/40 transition-all flex items-center justify-center gap-2">
+                    <button onClick={() => setJobTrackerStage("Saved")} className="w-full py-2.5 rounded-xl border border-[var(--rz-border)] text-xs font-semibold text-[var(--rz-muted)] hover:text-foreground hover:border-primary/40 transition-all flex items-center justify-center gap-2">
                       📋 Save to Job Tracker
                     </button>
                   )}
@@ -1297,18 +1307,18 @@ export default function Home() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, ease: "easeOut", delay: 0.05 }}
-                className="flex-1 flex flex-col min-w-0 bg-[#070c18] relative"
+                className="flex-1 flex flex-col min-w-0 bg-[var(--rz-bg)] relative"
               >
 
                 {/* Feature tab bar with amber underline indicator */}
-                <div className="flex-shrink-0 border-b border-[#1e304a] px-4 flex items-end overflow-x-auto hide-scrollbar" style={{ height: "48px" }}>
+                <div className="flex-shrink-0 border-b border-[var(--rz-border)] px-4 flex items-end overflow-x-auto hide-scrollbar" style={{ height: "48px" }}>
                   {featureTabs.map(tab => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveFeatureTab(tab.id)}
                       className={cn(
                         "relative px-3 h-full flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap transition-colors",
-                        activeFeatureTab === tab.id ? "text-primary" : "text-[#4a6080] hover:text-foreground"
+                        activeFeatureTab === tab.id ? "text-primary" : "text-[var(--rz-muted)] hover:text-foreground"
                       )}
                     >
                       <tab.icon className={cn("w-3.5 h-3.5", tab.id === "agent" && "fill-current")} />
@@ -1326,7 +1336,7 @@ export default function Home() {
                   <button
                     onClick={() => setActiveFeatureTab("history")}
                     className={cn("relative px-3 h-full flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap transition-colors mb-px",
-                      activeFeatureTab === "history" ? "text-primary" : "text-[#4a6080] hover:text-foreground"
+                      activeFeatureTab === "history" ? "text-primary" : "text-[var(--rz-muted)] hover:text-foreground"
                     )}
                   >
                     <History className="w-3.5 h-3.5" /> History
@@ -1356,11 +1366,11 @@ export default function Home() {
                         <div className="h-full flex flex-col gap-0" style={{ minHeight: 0 }}>
                           <div className="flex items-center justify-between gap-3 mb-3 flex-shrink-0 flex-wrap">
                             {/* Sub-tabs */}
-                            <div className="flex items-center bg-[#0c1626] border border-[#1e304a] rounded-xl p-1 gap-1">
-                              <button onClick={() => setResumeViewMode("preview")} className={cn("px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all", resumeViewMode === "preview" ? "bg-[#070c18] text-foreground shadow-sm" : "text-[#4a6080] hover:text-foreground")}>
+                            <div className="flex items-center bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-1 gap-1">
+                              <button onClick={() => setResumeViewMode("preview")} className={cn("px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all", resumeViewMode === "preview" ? "bg-[var(--rz-bg)] text-foreground shadow-sm" : "text-[var(--rz-muted)] hover:text-foreground")}>
                                 <Eye className="w-3.5 h-3.5" /> Preview
                               </button>
-                              <button onClick={() => setResumeViewMode("edit")} className={cn("px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all", resumeViewMode === "edit" ? "bg-[#070c18] text-foreground shadow-sm" : "text-[#4a6080] hover:text-foreground")}>
+                              <button onClick={() => setResumeViewMode("edit")} className={cn("px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all", resumeViewMode === "edit" ? "bg-[var(--rz-bg)] text-foreground shadow-sm" : "text-[var(--rz-muted)] hover:text-foreground")}>
                                 <FileCode2 className="w-3.5 h-3.5" /> Edit LaTeX
                               </button>
                             </div>
@@ -1371,40 +1381,40 @@ export default function Home() {
                               </div>
                               <div className="relative" ref={downloadMenuRef}>
                                 <div className="flex">
-                                  <button onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.pdf`)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-[#070c18] rounded-l-lg text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                                  <button onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.pdf`)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-[var(--rz-accent-text)] rounded-l-lg text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50">
                                     {downloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} PDF
                                   </button>
-                                  <button onClick={() => setShowDownloadMenu(v => !v)} className="px-2 py-1.5 bg-primary/90 text-[#070c18] rounded-r-lg border-l border-[#070c18]/20 hover:bg-primary transition-colors">
+                                  <button onClick={() => setShowDownloadMenu(v => !v)} className="px-2 py-1.5 bg-primary/90 text-[var(--rz-accent-text)] rounded-r-lg border-l border-[#070c18]/20 hover:bg-primary transition-colors">
                                     <ChevronDown className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                                 {showDownloadMenu && (
-                                  <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-[#0c1626] border border-[#1e304a] rounded-xl shadow-xl overflow-hidden">
+                                  <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl shadow-xl overflow-hidden">
                                     <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.docx`)} disabled={downloadingDocx} className="w-full flex items-center gap-2 px-4 py-3 text-xs text-foreground hover:bg-[#1e304a]/50 transition-colors">
                                       {downloadingDocx ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Word (.docx)
                                     </button>
                                   </div>
                                 )}
                               </div>
-                              <a href={generateOverleafUrl(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0c1626] border border-[#1e304a] rounded-lg text-xs font-semibold hover:border-primary/40 transition-colors text-foreground">
+                              <a href={generateOverleafUrl(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-lg text-xs font-semibold hover:border-primary/40 transition-colors text-foreground">
                                 <ExternalLink className="w-3.5 h-3.5" /> Overleaf
                               </a>
                               <CopyButton text={editableLatex[activeJdTab] || result.results[activeJdTab].latex} label="Copy LaTeX" />
                             </div>
                           </div>
-                          <div className="flex-1 overflow-hidden rounded-xl border border-[#1e304a]" style={{ minHeight: 0 }}>
+                          <div className="flex-1 overflow-hidden rounded-xl border border-[var(--rz-border)]" style={{ minHeight: 0 }}>
                             {resumeViewMode === "preview" ? (
                               previewLoading[activeJdTab] ? (
-                                <div className="h-full flex flex-col items-center justify-center gap-4 bg-[#525659]">
+                                <div className="h-full flex flex-col items-center justify-center gap-4 bg-[var(--rz-pdf-bg)]">
                                   <Loader2 className="w-8 h-8 animate-spin text-white/60" />
                                   <p className="text-sm text-white/50">Compiling preview…</p>
                                 </div>
                               ) : previewBlobs[activeJdTab] ? (
                                 <PdfPreview blob={previewBlobs[activeJdTab]} />
                               ) : (
-                                <div className="h-full flex flex-col items-center justify-center gap-3 bg-[#0c1626]/30">
-                                  <FileCode2 className="w-10 h-10 text-[#4a6080]/40" />
-                                  <p className="text-sm text-[#4a6080]">Preview unavailable — switch to Edit LaTeX</p>
+                                <div className="h-full flex flex-col items-center justify-center gap-3 bg-[var(--rz-surface)]/30">
+                                  <FileCode2 className="w-10 h-10 text-[var(--rz-muted)]/40" />
+                                  <p className="text-sm text-[var(--rz-muted)]">Preview unavailable — switch to Edit LaTeX</p>
                                 </div>
                               )
                             ) : (
@@ -1429,7 +1439,7 @@ export default function Home() {
                       {activeFeatureTab === "ats" && (
                         <div className="max-w-4xl mx-auto space-y-6">
                           {(result.results[activeJdTab].matched_keywords?.length > 0 || result.results[activeJdTab].missing_keywords?.length > 0) && (
-                            <div className="bg-[#0c1626] border border-[#1e304a] rounded-xl p-6 shadow-sm space-y-5">
+                            <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-6 shadow-sm space-y-5">
                               <h3 className="text-lg font-bold text-foreground">Keyword Analysis</h3>
                               {result.results[activeJdTab].matched_keywords?.length > 0 && (
                                 <div>
@@ -1454,7 +1464,7 @@ export default function Home() {
                                     ))}
                                   </div>
                                   <div className="flex items-center justify-between gap-4 flex-wrap">
-                                    <p className="text-xs text-[#4a6080]">These keywords appear in the JD but not in your resume.</p>
+                                    <p className="text-xs text-[var(--rz-muted)]">These keywords appear in the JD but not in your resume.</p>
                                     <button onClick={() => handleFixWithAgent(result.results[activeJdTab].missing_keywords)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary text-xs font-bold hover:bg-primary/20 transition-colors flex-shrink-0">
                                       <Zap className="w-3 h-3 fill-current" /> Fix with RezAI Agent
                                     </button>
@@ -1467,10 +1477,10 @@ export default function Home() {
                             <AtsCard title="Original Resume" data={result.results[activeJdTab].atsOriginal} type="neutral" />
                             <AtsCard title="Tailored Version" data={result.results[activeJdTab].atsTailored} type="success" />
                           </div>
-                          <div className="bg-[#0c1626] border border-[#1e304a] rounded-xl p-6 flex items-center justify-between shadow-lg">
+                          <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-6 flex items-center justify-between shadow-lg">
                             <div>
                               <h3 className="text-lg font-bold text-foreground">Optimization Result</h3>
-                              <p className="text-[#4a6080] text-sm mt-1">Your resume was rewritten to hit target keywords and use the XYZ impact formula.</p>
+                              <p className="text-[var(--rz-muted)] text-sm mt-1">Your resume was rewritten to hit target keywords and use the XYZ impact formula.</p>
                             </div>
                             <div className="text-right">
                               <div className="text-4xl font-mono font-bold text-primary">+{Math.max(0, result.results[activeJdTab].atsTailored.score - result.results[activeJdTab].atsOriginal.score)}</div>
@@ -1484,7 +1494,7 @@ export default function Home() {
                       {activeFeatureTab === "cover" && (
                         <div className="max-w-3xl mx-auto h-full flex flex-col">
                           <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={result.results[activeJdTab].coverLetter} /></div>
-                          <div className="flex-1 bg-[#0c1626] border border-[#1e304a] rounded-xl p-8 overflow-auto shadow-sm">
+                          <div className="flex-1 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-8 overflow-auto shadow-sm">
                             <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.results[activeJdTab].coverLetter}</p>
                           </div>
                         </div>
@@ -1494,7 +1504,7 @@ export default function Home() {
                       {activeFeatureTab === "email" && (
                         <div className="max-w-3xl mx-auto h-full flex flex-col">
                           <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={result.results[activeJdTab].email} /></div>
-                          <div className="bg-[#0c1626] border border-[#1e304a] rounded-xl p-8 shadow-sm">
+                          <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-8 shadow-sm">
                             <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.results[activeJdTab].email}</p>
                           </div>
                         </div>
@@ -1503,15 +1513,15 @@ export default function Home() {
                       {/* ── LINKEDIN ── */}
                       {activeFeatureTab === "linkedin" && (
                         <div className="max-w-3xl mx-auto space-y-6">
-                          <div className="bg-[#0c1626] border border-[#1e304a] rounded-xl overflow-hidden shadow-sm">
-                            <div className="bg-[#0a66c2]/10 border-b border-[#1e304a] px-6 py-3 flex justify-between items-center">
+                          <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl overflow-hidden shadow-sm">
+                            <div className="bg-[#0a66c2]/10 border-b border-[var(--rz-border)] px-6 py-3 flex justify-between items-center">
                               <h3 className="font-semibold text-[#0a66c2] flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Optimized Headline</h3>
                               <CopyButton text={result.linkedin.headline} minimal />
                             </div>
                             <div className="p-6"><p className="text-lg font-medium text-foreground leading-snug">{result.linkedin.headline}</p></div>
                           </div>
-                          <div className="bg-[#0c1626] border border-[#1e304a] rounded-xl overflow-hidden shadow-sm">
-                            <div className="bg-[#0a66c2]/10 border-b border-[#1e304a] px-6 py-3 flex justify-between items-center">
+                          <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl overflow-hidden shadow-sm">
+                            <div className="bg-[#0a66c2]/10 border-b border-[var(--rz-border)] px-6 py-3 flex justify-between items-center">
                               <h3 className="font-semibold text-[#0a66c2] flex items-center gap-2"><MessageSquare className="w-4 h-4" /> About Section</h3>
                               <CopyButton text={result.linkedin.about} minimal />
                             </div>
@@ -1524,51 +1534,51 @@ export default function Home() {
                       {activeFeatureTab === "agent" && (
                         <div className="h-full flex">
                           {/* Chat (55%) */}
-                          <div className="flex flex-col border-r border-[#1e304a]" style={{ width: "55%" }}>
-                            <div className="flex-shrink-0 px-5 py-3 border-b border-[#1e304a] flex items-center gap-3 bg-[#070c18]">
+                          <div className="flex flex-col border-r border-[var(--rz-border)]" style={{ width: "55%" }}>
+                            <div className="flex-shrink-0 px-5 py-3 border-b border-[var(--rz-border)] flex items-center gap-3 bg-[var(--rz-bg)]">
                               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
                                 <Zap className="w-4 h-4 text-primary fill-current" />
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-foreground">RezAI Agent</p>
-                                <p className="text-xs text-[#4a6080]">Resume for {result.results[activeJdTab].company}</p>
+                                <p className="text-xs text-[var(--rz-muted)]">Resume for {result.results[activeJdTab].company}</p>
                               </div>
                             </div>
                             <div className="flex-1 overflow-hidden px-5">
                               {renderAgentChat({ messages: agentMessages[activeJdTab] || [], loading: !!agentLoading[activeJdTab], bottomRef: agentBottomRef })}
                             </div>
-                            <div className="flex-shrink-0 px-5 py-4 border-t border-[#1e304a] bg-[#070c18]">
+                            <div className="flex-shrink-0 px-5 py-4 border-t border-[var(--rz-border)] bg-[var(--rz-bg)]">
                               <div className="flex gap-2">
                                 <input type="text" value={agentInput} onChange={e => setAgentInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
                                   placeholder="Edit resume or ask career questions..."
-                                  className="flex-1 bg-[#0c1626] border border-[#1e304a] rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-[#4a6080] focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+                                  className="flex-1 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-[var(--rz-muted)] focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
                                   disabled={!!agentLoading[activeJdTab]} />
                                 <button onClick={handleAgentSend} disabled={!agentInput.trim() || !!agentLoading[activeJdTab]}
-                                  className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center text-[#070c18] disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0">
+                                  className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center text-[var(--rz-accent-text)] disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0">
                                   {agentLoading[activeJdTab] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
                                 </button>
                               </div>
                             </div>
                           </div>
                           {/* Live Preview (45%) */}
-                          <div className="flex flex-col bg-[#070c18]" style={{ width: "45%" }}>
-                            <div className="flex-shrink-0 px-5 py-3 border-b border-[#1e304a] flex items-center justify-between">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080]">Live Preview</p>
+                          <div className="flex flex-col bg-[var(--rz-bg)]" style={{ width: "45%" }}>
+                            <div className="flex-shrink-0 px-5 py-3 border-b border-[var(--rz-border)] flex items-center justify-between">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)]">Live Preview</p>
                               {previewLoading[activeJdTab] && <div className="flex items-center gap-1.5 text-xs text-primary"><Loader2 className="w-3 h-3 animate-spin" /> Updating...</div>}
                             </div>
                             <div className="flex-1 overflow-hidden">
                               {previewBlobs[activeJdTab] ? <PdfPreview blob={previewBlobs[activeJdTab]} /> : (
-                                <div className="h-full flex flex-col items-center justify-center gap-3 bg-[#0c1626]/40">
-                                  <FileCode2 className="w-10 h-10 text-[#4a6080]/30" />
-                                  <p className="text-sm text-[#4a6080]/60">Preview loading...</p>
+                                <div className="h-full flex flex-col items-center justify-center gap-3 bg-[var(--rz-surface)]/40">
+                                  <FileCode2 className="w-10 h-10 text-[var(--rz-muted)]/30" />
+                                  <p className="text-sm text-[var(--rz-muted)]/60">Preview loading...</p>
                                 </div>
                               )}
                             </div>
-                            <div className="flex-shrink-0 px-4 py-3 border-t border-[#1e304a] flex gap-2">
+                            <div className="flex-shrink-0 px-4 py-3 border-t border-[var(--rz-border)] flex gap-2">
                               <button onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary/10 border border-primary/25 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors disabled:opacity-40">
                                 {downloadingPdf ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF
                               </button>
-                              <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} disabled={downloadingDocx || !editableLatex[activeJdTab]} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#0c1626] border border-[#1e304a] text-[#4a6080] rounded-lg text-xs font-bold hover:text-foreground transition-colors disabled:opacity-40">
+                              <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} disabled={downloadingDocx || !editableLatex[activeJdTab]} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[var(--rz-surface)] border border-[var(--rz-border)] text-[var(--rz-muted)] rounded-lg text-xs font-bold hover:text-foreground transition-colors disabled:opacity-40">
                                 {downloadingDocx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} Word
                               </button>
                             </div>
@@ -1582,21 +1592,21 @@ export default function Home() {
                           <div className="flex items-center justify-between mb-6">
                             <h2 className="text-xl font-bold text-foreground flex items-center gap-2"><History className="w-5 h-5 text-primary" /> Generation History</h2>
                             {history.length > 0 && (
-                              <button onClick={() => { if (confirm("Clear all history?")) clearHistory(); }} className="text-sm text-[#4a6080] hover:text-destructive transition-colors">Clear All</button>
+                              <button onClick={() => { if (confirm("Clear all history?")) clearHistory(); }} className="text-sm text-[var(--rz-muted)] hover:text-destructive transition-colors">Clear All</button>
                             )}
                           </div>
                           <div className="space-y-4">
                             {history.length === 0 ? (
-                              <p className="text-[#4a6080] text-center py-12">No history yet.</p>
+                              <p className="text-[var(--rz-muted)] text-center py-12">No history yet.</p>
                             ) : history.map(item => (
-                              <div key={item.id} className="bg-[#0c1626] border border-[#1e304a] p-5 rounded-xl hover:border-primary/40 transition-colors group">
+                              <div key={item.id} className="bg-[var(--rz-surface)] border border-[var(--rz-border)] p-5 rounded-xl hover:border-primary/40 transition-colors group">
                                 <div className="flex justify-between items-start mb-3">
-                                  <div className="text-xs text-[#4a6080]">{new Date(item.date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>
+                                  <div className="text-xs text-[var(--rz-muted)]">{new Date(item.date).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>
                                   <div className="flex items-center gap-2">
-                                    <button onClick={() => loadHistoryItem(item)} className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-semibold hover:bg-primary hover:text-[#070c18] transition-colors flex items-center gap-1">
+                                    <button onClick={() => loadHistoryItem(item)} className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-semibold hover:bg-primary hover:text-[var(--rz-accent-text)] transition-colors flex items-center gap-1">
                                       <Eye className="w-3.5 h-3.5" /> Load
                                     </button>
-                                    <button onClick={() => deleteHistory(item.id)} className="p-1.5 text-[#4a6080] hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => deleteHistory(item.id)} className="p-1.5 text-[var(--rz-muted)] hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
                                       <Trash2 className="w-4 h-4" />
                                     </button>
                                   </div>
@@ -1605,7 +1615,7 @@ export default function Home() {
                                   {item.jds.map((jd, i) => (
                                     <div key={i} className="flex items-center gap-2 text-sm text-foreground/80">
                                       <span className="w-1.5 h-1.5 rounded-full bg-primary/50" />
-                                      {jd.title || "Untitled Role"} <span className="text-[#4a6080] font-normal">at</span> {jd.company || "Unknown Company"}
+                                      {jd.title || "Untitled Role"} <span className="text-[var(--rz-muted)] font-normal">at</span> {jd.company || "Unknown Company"}
                                     </div>
                                   ))}
                                 </div>
@@ -1629,38 +1639,38 @@ export default function Home() {
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 16, scale: 0.96 }}
                           transition={{ duration: 0.2, ease: "easeOut" }}
-                          className="w-[380px] h-[520px] rounded-2xl bg-[#0c1626] border border-[#1e304a] shadow-2xl flex flex-col overflow-hidden"
+                          className="w-[380px] h-[520px] rounded-2xl bg-[var(--rz-surface)] border border-[var(--rz-border)] shadow-2xl flex flex-col overflow-hidden"
                           style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(240,160,32,0.08)" }}
                         >
-                          <div className="flex-shrink-0 px-4 py-3 bg-[#070c18] border-b border-[#1e304a] flex items-center justify-between">
+                          <div className="flex-shrink-0 px-4 py-3 bg-[var(--rz-bg)] border-b border-[var(--rz-border)] flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
                               <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
                                 <Zap className="w-3.5 h-3.5 text-primary fill-current" />
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-foreground leading-none">RezAI Agent</p>
-                                <p className="text-[10px] text-[#4a6080] mt-0.5">Resume for {result.results[activeJdTab]?.company || "—"} loaded</p>
+                                <p className="text-[10px] text-[var(--rz-muted)] mt-0.5">Resume for {result.results[activeJdTab]?.company || "—"} loaded</p>
                               </div>
                             </div>
-                            <button onClick={() => setAgentOpen(false)} className="p-1.5 text-[#4a6080] hover:text-foreground transition-colors rounded-lg hover:bg-white/5">
+                            <button onClick={() => setAgentOpen(false)} className="p-1.5 text-[var(--rz-muted)] hover:text-foreground transition-colors rounded-lg hover:bg-white/5">
                               <X className="w-4 h-4" />
                             </button>
                           </div>
                           <div className="flex-1 overflow-hidden px-4">
                             {renderAgentChat({ messages: agentMessages[activeJdTab] || [], loading: !!agentLoading[activeJdTab], bottomRef: agentBubbleBottomRef, compact: true })}
                           </div>
-                          <div className="flex-shrink-0 px-3 pb-3 pt-2 border-t border-[#1e304a] bg-[#070c18] space-y-2">
+                          <div className="flex-shrink-0 px-3 pb-3 pt-2 border-t border-[var(--rz-border)] bg-[var(--rz-bg)] space-y-2">
                             <div className="flex gap-2">
                               <input type="text" value={agentInput} onChange={e => setAgentInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
                                 placeholder="Edit resume or ask career questions..."
-                                className="flex-1 bg-[#0c1626] border border-[#1e304a] rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-[#4a6080] focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+                                className="flex-1 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-[var(--rz-muted)] focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
                                 disabled={!!agentLoading[activeJdTab]} />
                               <button onClick={handleAgentSend} disabled={!agentInput.trim() || !!agentLoading[activeJdTab]}
-                                className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-[#070c18] disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0">
+                                className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-[var(--rz-accent-text)] disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0">
                                 {agentLoading[activeJdTab] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 fill-current" />}
                               </button>
                             </div>
-                            <button onClick={() => { setActiveFeatureTab("agent"); setAgentOpen(false); }} className="w-full text-center text-xs text-[#4a6080] hover:text-primary transition-colors py-0.5">
+                            <button onClick={() => { setActiveFeatureTab("agent"); setAgentOpen(false); }} className="w-full text-center text-xs text-[var(--rz-muted)] hover:text-primary transition-colors py-0.5">
                               ↗ Open full view
                             </button>
                           </div>
@@ -1671,7 +1681,7 @@ export default function Home() {
                       {!agentOpen && <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping pointer-events-none" style={{ animationDuration: "2s" }} />}
                       <button onClick={() => setAgentOpen(v => !v)} title="Chat with RezAI Agent"
                         className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 hover:bg-primary/90 hover:scale-105 active:scale-95 transition-all duration-200">
-                        {agentOpen ? <X className="w-6 h-6 text-[#070c18]" /> : <Zap className="w-6 h-6 text-[#070c18] fill-current" />}
+                        {agentOpen ? <X className="w-6 h-6 text-[var(--rz-accent-text)]" /> : <Zap className="w-6 h-6 text-[var(--rz-accent-text)] fill-current" />}
                       </button>
                     </div>
                   </div>
@@ -1687,38 +1697,38 @@ export default function Home() {
       <style dangerouslySetInnerHTML={{ __html: `
         .card-input {
           width: 100%;
-          background: #070c18;
-          border: 1px solid #1b2d45;
+          background: var(--rz-bg);
+          border: 1px solid var(--rz-border-input);
           border-radius: 10px;
           padding: 8px 12px;
           font-size: 13px;
-          color: #e2ddd4;
+          color: var(--rz-text);
           outline: none;
           transition: border-color 0.15s;
         }
-        .card-input::placeholder { color: #4a6080; }
-        .card-input:focus { border-color: #f0a020; }
+        .card-input::placeholder { color: var(--rz-muted); }
+        .card-input:focus { border-color: var(--rz-accent); }
         .card-textarea {
           width: 100%;
-          background: #070c18;
-          border: 1px solid #1b2d45;
+          background: var(--rz-bg);
+          border: 1px solid var(--rz-border-input);
           border-radius: 10px;
           padding: 8px 12px;
           font-size: 13px;
-          color: #e2ddd4;
+          color: var(--rz-text);
           outline: none;
           transition: border-color 0.15s;
           resize: vertical;
           min-height: 80px;
         }
-        .card-textarea::placeholder { color: #4a6080; }
-        .card-textarea:focus { border-color: #f0a020; }
+        .card-textarea::placeholder { color: var(--rz-muted); }
+        .card-textarea:focus { border-color: var(--rz-accent); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e304a; border-radius: 2px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4a6080; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--rz-border); border-radius: 2px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--rz-muted); }
       ` }} />
     </div>
   );
@@ -1731,13 +1741,13 @@ function CopyButton({ text, label = "Copy", minimal = false }: { text: string; l
   const handleCopy = () => { copyToClipboard(text); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   if (minimal) {
     return (
-      <button onClick={handleCopy} className="p-1.5 text-[#4a6080] hover:text-primary transition-colors">
+      <button onClick={handleCopy} className="p-1.5 text-[var(--rz-muted)] hover:text-primary transition-colors">
         {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
       </button>
     );
   }
   return (
-    <button onClick={handleCopy} className="px-3 py-1.5 bg-[#0c1626] hover:bg-[#1e304a]/50 border border-[#1e304a] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors text-foreground">
+    <button onClick={handleCopy} className="px-3 py-1.5 bg-[var(--rz-surface)] hover:bg-[#1e304a]/50 border border-[var(--rz-border)] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors text-foreground">
       {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
       {copied ? "Copied!" : label}
     </button>
@@ -1750,18 +1760,18 @@ function AtsCard({ title, data, type }: { title: string; data: AtsScore; type: "
   let barClass = "bg-warning";
   if (score >= 80) { colorClass = "text-success"; barClass = "bg-success"; }
   else if (score <= 50) { colorClass = "text-destructive"; barClass = "bg-destructive"; }
-  if (type === "neutral") { colorClass = "text-foreground"; barClass = "bg-[#4a6080]"; }
+  if (type === "neutral") { colorClass = "text-foreground"; barClass = "bg-[var(--rz-muted)]"; }
   return (
-    <div className="bg-[#0c1626] border border-[#1e304a] rounded-xl p-6 flex flex-col">
-      <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] mb-4">{title}</h4>
+    <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-6 flex flex-col">
+      <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] mb-4">{title}</h4>
       <div className="flex items-end gap-2 mb-4">
         <span className={cn("text-6xl font-mono font-bold leading-none", colorClass)}>{score}</span>
-        <span className="text-xl text-[#4a6080] font-mono mb-1">/100</span>
+        <span className="text-xl text-[var(--rz-muted)] font-mono mb-1">/100</span>
       </div>
-      <div className="w-full h-2 bg-[#070c18] rounded-full overflow-hidden mb-6">
+      <div className="w-full h-2 bg-[var(--rz-bg)] rounded-full overflow-hidden mb-6">
         <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }} transition={{ duration: 1, ease: "easeOut" }} className={cn("h-full rounded-full", barClass)} />
       </div>
-      <div className="flex-1 bg-[#070c18] rounded-lg p-4 text-sm text-[#4a6080] leading-relaxed">
+      <div className="flex-1 bg-[var(--rz-bg)] rounded-lg p-4 text-sm text-[var(--rz-muted)] leading-relaxed">
         {data?.breakdown || "No breakdown provided."}
       </div>
     </div>

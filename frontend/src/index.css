@@ -49,11 +49,11 @@
   --background: 224 40% 5%;
   --surface: 222 35% 8%;
   --surface-hover: 220 30% 12%;
-  
+
   --foreground: 40 20% 95%;
   --muted: 220 20% 15%;
   --muted-foreground: 220 15% 65%;
-  
+
   --border: 220 30% 14%;
   --input: 220 30% 12%;
   --ring: 37 90% 55%;
@@ -71,12 +71,65 @@
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  
+
   --success: 142 71% 45%;
   --success-foreground: 144 80% 10%;
-  
+
   --warning: 38 92% 50%;
   --warning-foreground: 48 96% 10%;
+
+  /* ── RezAI theme tokens (dark default) ── */
+  --rz-bg: #070c18;
+  --rz-surface: #0c1626;
+  --rz-border: #1e304a;
+  --rz-border-input: #1b2d45;
+  --rz-text: #e2ddd4;
+  --rz-muted: #4a6080;
+  --rz-hint: #2e4060;
+  --rz-accent: #f0a020;
+  --rz-accent-hover: #c77a10;
+  --rz-accent-text: #070c18;
+  --rz-card-bg: rgba(255,255,255,0.02);
+  --rz-card-border: rgba(255,255,255,0.06);
+  --rz-card-hover-border: rgba(240,160,32,0.25);
+  --rz-pdf-bg: #525659;
+}
+
+/* ── Light theme overrides ── */
+:root.light {
+  --background: 40 10% 98%;
+  --surface: 0 0% 100%;
+  --surface-hover: 0 0% 97%;
+  --foreground: 20 10% 11%;
+  --muted: 40 6% 91%;
+  --muted-foreground: 25 5% 64%;
+  --border: 40 6% 90%;
+  --input: 0 0% 100%;
+  --ring: 220 63% 33%;
+  --primary: 220 63% 33%;
+  --primary-hover: 220 65% 40%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 40 6% 95%;
+  --secondary-foreground: 20 10% 11%;
+  --accent: 40 6% 91%;
+  --accent-foreground: 220 63% 33%;
+  --destructive: 0 84% 35%;
+  --success: 142 71% 28%;
+
+  --rz-bg: #fafaf9;
+  --rz-surface: #ffffff;
+  --rz-border: #e7e5e4;
+  --rz-border-input: #e7e5e4;
+  --rz-text: #1c1917;
+  --rz-muted: #a8a29e;
+  --rz-hint: #d6d3d1;
+  --rz-accent: #1e3a8a;
+  --rz-accent-hover: #1e40af;
+  --rz-accent-text: #ffffff;
+  --rz-card-bg: #ffffff;
+  --rz-card-border: #e7e5e4;
+  --rz-card-hover-border: rgba(30,58,138,0.25);
+  --rz-pdf-bg: #e8e6e3;
 }
 
 @layer base {
@@ -102,6 +155,9 @@
   .text-gradient-gold {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[#F7C353] via-[#D49E37] to-[#B37D22];
   }
+  :root.light .text-gradient-gold {
+    background-image: linear-gradient(to right, #1e3a8a, #1e40af, #1d4ed8);
+  }
   
   .shadow-glow {
     box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.3);
@@ -121,6 +177,11 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/50;
   }
+}
+
+/* Smooth theme transition */
+*, *::before, *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease;
 }
 
 /* Animations */
