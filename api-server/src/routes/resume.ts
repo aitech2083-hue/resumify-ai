@@ -556,10 +556,13 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
   try {
     // Start the actor run
     const runRes = await fetch(
-      `https://api.apify.com/v2/acts/harvestapi~linkedin-profile-scraper/runs?token=${token}`,
+      `https://api.apify.com/v2/acts/apify~linkedin-profile-scraper/runs`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           profileUrls: [linkedinUrl],
           profileScraperMode: "Short ($4 per 1k)",
@@ -568,6 +571,8 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
     );
 
     if (!runRes.ok) {
+      console.error("Apify error status:", runRes.status);
+      console.error("Apify error body:", await runRes.text());
       throw new Error("Failed to start Apify scraper");
     }
 
@@ -579,7 +584,8 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
     let items: any[] = [];
     for (let attempt = 0; attempt < 5; attempt++) {
       const dataRes = await fetch(
-        `https://api.apify.com/v2/acts/harvestapi~linkedin-profile-scraper/runs/last/dataset/items?token=${token}`,
+        `https://api.apify.com/v2/acts/apify~linkedin-profile-scraper/runs/last/dataset/items`,
+        { headers: { "Authorization": `Bearer ${token}` } },
       );
       if (dataRes.ok) {
         items = await dataRes.json();
