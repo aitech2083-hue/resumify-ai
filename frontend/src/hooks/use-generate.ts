@@ -9,6 +9,8 @@ interface GenerateParams {
   scratchData?: ScratchData;
   resumeFile?: File | null;
   linkedinFile?: File | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  linkedinProfile?: Record<string, any> | null;
 }
 
 export function useGenerateResume() {
@@ -43,6 +45,8 @@ export function useGenerateResume() {
         formData.append("resume", params.resumeFile);
       } else if (params.mode === "linkedin" && params.linkedinFile) {
         formData.append("resume", params.linkedinFile);
+      } else if (params.mode === "linkedin" && params.linkedinProfile) {
+        formData.append("linkedinProfile", JSON.stringify(params.linkedinProfile));
       } else if (params.mode !== "scratch") {
         throw new Error("Please provide a resume file.");
       }
