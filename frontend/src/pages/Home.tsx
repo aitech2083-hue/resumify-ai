@@ -61,6 +61,20 @@ export default function Home() {
   // -- Input State --
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [linkedinFile, setLinkedinFile] = useState<File | null>(null);
+
+  // LinkedIn URL import state
+  const [linkedinImportType, setLinkedinImportType] = useState<"url" | "pdf">("url");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [linkedinImporting, setLinkedinImporting] = useState(false);
+  const [linkedinProfile, setLinkedinProfile] = useState<{
+    name?: string | null; email?: string | null; phone?: string | null;
+    location?: string | null; headline?: string | null; summary?: string | null;
+    experience?: Array<{ title: string; company: string; duration: string; highlights: string[] }>;
+    education?: Array<{ degree: string; institution: string; year?: string | null }>;
+    skills?: string[];
+  } | null>(null);
+  const [linkedinImportError, setLinkedinImportError] = useState<string | null>(null);
+
   const [extraUploadExp, setExtraUploadExp] = useState<AdditionalExp>(initialAdditionalExp);
   const [extraLinkedinExp, setExtraLinkedinExp] = useState<AdditionalExp>(initialAdditionalExp);
   const [scratchData, setScratchData] = useState<ScratchData>(initialScratchData);
@@ -142,7 +156,8 @@ export default function Home() {
         mode, tone, jds,
         extra: extraNotes,
         scratchData: mode === "scratch" ? scratchData : undefined,
-        resumeFile, linkedinFile
+        resumeFile, linkedinFile,
+        linkedinProfile: mode === "linkedin" && linkedinImportType === "url" ? linkedinProfile : undefined,
       });
 
       setResult(data);
@@ -169,6 +184,45 @@ export default function Home() {
     setShowChangingJd(false);
     setShowSidebarExtra(false);
     setJobTrackerStage(null);
+  };
+
+  const handleLinkedInImport = async () => {
+    if (!linkedinUrl.trim()) return;
+    if (!linkedinUrl.includes("linkedin.com/in/")) {
+      setLinkedinImportError("Please enter a valid LinkedIn profile URL (linkedin.com/in/yourname)");
+      return;
+    }
+    setLinkedinImporting(true);
+    setLinkedinImportError(null);
+    setLinkedinProfile(null);
+    try {
+      const baseUrl = import.meta.env.BASE_URL || "/";
+      const res = await fetch(`${baseUrl}api/resume/linkedin-import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ linkedinUrl: linkedinUrl.trim() }),
+      });
+      if (res.status === 504) {
+        setLinkedinImportError("Taking too long. Try again or use PDF upload.");
+        return;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const msg = err?.error || "";
+        if (msg.includes("not found") || msg.includes("private")) {
+          setLinkedinImportError("Could not import this profile. Try PDF upload instead.");
+        } else {
+          setLinkedinImportError(msg || "Import failed. Try PDF upload instead.");
+        }
+        return;
+      }
+      const data = await res.json();
+      setLinkedinProfile(data.profile);
+    } catch {
+      setLinkedinImportError("Import failed. Check your connection and try again.");
+    } finally {
+      setLinkedinImporting(false);
+    }
   };
 
   const loadHistoryItem = (item: any) => {
@@ -689,48 +743,202 @@ export default function Home() {
                             {/* LINKEDIN */}
                             {mode === "linkedin" && (
                               <div className="space-y-4">
-                                <div className="bg-primary/5 border border-primary/15 rounded-xl p-4 text-sm text-primary/80">
-                                  <div className="font-semibold mb-2 flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> Export your LinkedIn as PDF</div>
-                                  {[
-                                    "Go to your LinkedIn profile page",
-                                    'Click "More" → "Save to PDF"',
-                                    "Upload the downloaded PDF below",
-                                  ].map((step, i) => (
-                                    <div key={i} className="flex items-start gap-2 mt-1.5">
-                                      <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
-                                      <span className="text-xs text-[#4a6080]">{step}</span>
-                                    </div>
-                                  ))}
+                                {/* Toggle cards */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                  {/* URL card */}
+                                  <button
+                                    type="button"
+                                    onClick={() => { setLinkedinImportType("url"); setLinkedinImportError(null); }}
+                                    className={cn(
+                                      "rounded-xl p-3 text-left transition-all border",
+                                      linkedinImportType === "url"
+                                        ? "border-primary bg-primary/10"
+                                        : "border-[#1e304a] bg-[#070c18] hover:border-[#2a3f5a]"
+                                    )}
+                                  >
+                                    <div className="text-sm mb-1">🔗 Paste URL</div>
+                                    <div className={cn("text-[10px] font-bold rounded-full px-1.5 py-0.5 inline-block mb-1.5",
+                                      linkedinImportType === "url" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[#4a6080]"
+                                    )}>Recommended · Automatic</div>
+                                    <div className="text-[11px] text-[#4a6080] leading-snug">Paste your LinkedIn URL and we import everything instantly</div>
+                                  </button>
+                                  {/* PDF card */}
+                                  <button
+                                    type="button"
+                                    onClick={() => { setLinkedinImportType("pdf"); setLinkedinImportError(null); }}
+                                    className={cn(
+                                      "rounded-xl p-3 text-left transition-all border",
+                                      linkedinImportType === "pdf"
+                                        ? "border-primary bg-primary/10"
+                                        : "border-[#1e304a] bg-[#070c18] hover:border-[#2a3f5a]"
+                                    )}
+                                  >
+                                    <div className="text-sm mb-1">📄 Upload PDF</div>
+                                    <div className={cn("text-[10px] font-bold rounded-full px-1.5 py-0.5 inline-block mb-1.5",
+                                      linkedinImportType === "pdf" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[#4a6080]"
+                                    )}>Manual</div>
+                                    <div className="text-[11px] text-[#4a6080] leading-snug">Export PDF from LinkedIn settings and upload here</div>
+                                  </button>
                                 </div>
-                                <Dropzone
-                                  accept={{ "application/pdf": [".pdf"] }}
-                                  selectedFile={linkedinFile}
-                                  onFileSelect={setLinkedinFile}
-                                  label="Drop LinkedIn PDF here or click to upload"
-                                  sublabel="Exported profile PDF"
-                                />
-                                <button
-                                  onClick={() => setShowLinkedinExtra(v => !v)}
-                                  className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
-                                >
-                                  <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", showLinkedinExtra && "rotate-90")} />
-                                  Have a recent job to add?
-                                </button>
-                                <AnimatePresence>
-                                  {showLinkedinExtra && (
-                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                                      <div className="p-3 bg-[#070c18] border border-[#1e304a] rounded-xl space-y-2">
-                                        <input type="text" placeholder="Company name" value={extraLinkedinExp.company} onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))} className="card-input" />
-                                        <input type="text" placeholder="Your role / position" value={extraLinkedinExp.role} onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))} className="card-input" />
-                                        <div className="flex gap-2">
-                                          <input type="text" placeholder="From" value={extraLinkedinExp.from} onChange={e => setExtraLinkedinExp(s => ({ ...s, from: e.target.value }))} className="card-input flex-1" />
-                                          <input type="text" placeholder="To" value={extraLinkedinExp.to} onChange={e => setExtraLinkedinExp(s => ({ ...s, to: e.target.value }))} className="card-input flex-1" />
-                                        </div>
-                                        <textarea placeholder="Key responsibilities..." value={extraLinkedinExp.responsibilities} onChange={e => setExtraLinkedinExp(s => ({ ...s, responsibilities: e.target.value }))} className="card-textarea min-h-[80px]" />
+
+                                {/* URL import panel */}
+                                {linkedinImportType === "url" && (
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#4a6080] block mb-1.5">Your LinkedIn profile URL</label>
+                                      <input
+                                        type="url"
+                                        placeholder="https://linkedin.com/in/yourname"
+                                        value={linkedinUrl}
+                                        onChange={e => { setLinkedinUrl(e.target.value); setLinkedinImportError(null); }}
+                                        onKeyDown={e => { if (e.key === "Enter" && !linkedinImporting && !linkedinProfile) handleLinkedInImport(); }}
+                                        className="card-input"
+                                        disabled={linkedinImporting || !!linkedinProfile}
+                                      />
+                                      <div className="text-[10px] text-[#4a6080] mt-1">Must be a public profile</div>
+                                    </div>
+
+                                    {/* Error */}
+                                    {linkedinImportError && (
+                                      <div className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+                                        {linkedinImportError}
                                       </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
+                                    )}
+
+                                    {/* Loading */}
+                                    {linkedinImporting && (
+                                      <div className="flex flex-col items-center gap-2 py-4">
+                                        <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                                        <div className="text-xs text-[#4a6080] text-center">Importing your profile...<br />this takes 15–30 seconds</div>
+                                      </div>
+                                    )}
+
+                                    {/* Success card */}
+                                    {linkedinProfile && !linkedinImporting && (
+                                      <div className="bg-success/10 border border-success/25 rounded-xl p-3 space-y-1">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-1.5 text-success text-xs font-semibold">
+                                            <Check className="w-3.5 h-3.5" /> Profile imported!
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => { setLinkedinProfile(null); setLinkedinUrl(""); setLinkedinImportError(null); }}
+                                            className="text-[10px] text-[#4a6080] hover:text-foreground transition-colors"
+                                          >Clear & retry</button>
+                                        </div>
+                                        {linkedinProfile.name && <div className="text-sm font-semibold text-foreground">{linkedinProfile.name}</div>}
+                                        {(linkedinProfile.headline || linkedinProfile.location) && (
+                                          <div className="text-xs text-[#4a6080]">
+                                            {[linkedinProfile.headline, linkedinProfile.location].filter(Boolean).join(" · ")}
+                                          </div>
+                                        )}
+                                        <div className="text-xs text-[#4a6080]">
+                                          {linkedinProfile.experience?.length ?? 0} roles · {linkedinProfile.skills?.length ?? 0} skills found
+                                        </div>
+                                        {/* Email fallback if missing */}
+                                        {!linkedinProfile.email && (
+                                          <div className="pt-2 border-t border-success/15">
+                                            <div className="text-[10px] text-[#4a6080] mb-1">📧 Email not found on profile</div>
+                                            <input
+                                              type="email"
+                                              placeholder="Enter your email (optional)"
+                                              className="card-input text-xs py-1.5"
+                                              onChange={e => setLinkedinProfile(p => p ? { ...p, email: e.target.value || null } : p)}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Import button */}
+                                    {!linkedinProfile && !linkedinImporting && (
+                                      <button
+                                        type="button"
+                                        onClick={handleLinkedInImport}
+                                        disabled={!linkedinUrl.trim()}
+                                        className="w-full py-2.5 rounded-xl bg-primary text-[#070c18] text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <Zap className="w-4 h-4 fill-current" /> Import Profile
+                                      </button>
+                                    )}
+
+                                    {/* Extra exp (shown after success) */}
+                                    {linkedinProfile && (
+                                      <>
+                                        <button
+                                          onClick={() => setShowLinkedinExtra(v => !v)}
+                                          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+                                        >
+                                          <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", showLinkedinExtra && "rotate-90")} />
+                                          Have a recent job to add?
+                                        </button>
+                                        <AnimatePresence>
+                                          {showLinkedinExtra && (
+                                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                                              <div className="p-3 bg-[#070c18] border border-[#1e304a] rounded-xl space-y-2">
+                                                <input type="text" placeholder="Company name" value={extraLinkedinExp.company} onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))} className="card-input" />
+                                                <input type="text" placeholder="Your role / position" value={extraLinkedinExp.role} onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))} className="card-input" />
+                                                <div className="flex gap-2">
+                                                  <input type="text" placeholder="From" value={extraLinkedinExp.from} onChange={e => setExtraLinkedinExp(s => ({ ...s, from: e.target.value }))} className="card-input flex-1" />
+                                                  <input type="text" placeholder="To" value={extraLinkedinExp.to} onChange={e => setExtraLinkedinExp(s => ({ ...s, to: e.target.value }))} className="card-input flex-1" />
+                                                </div>
+                                                <textarea placeholder="Key responsibilities..." value={extraLinkedinExp.responsibilities} onChange={e => setExtraLinkedinExp(s => ({ ...s, responsibilities: e.target.value }))} className="card-textarea min-h-[80px]" />
+                                              </div>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* PDF panel — existing flow */}
+                                {linkedinImportType === "pdf" && (
+                                  <div className="space-y-4">
+                                    <div className="bg-primary/5 border border-primary/15 rounded-xl p-4 text-sm text-primary/80">
+                                      <div className="font-semibold mb-2 flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> Export your LinkedIn as PDF</div>
+                                      {[
+                                        "Go to your LinkedIn profile page",
+                                        'Click "More" → "Save to PDF"',
+                                        "Upload the downloaded PDF below",
+                                      ].map((step, i) => (
+                                        <div key={i} className="flex items-start gap-2 mt-1.5">
+                                          <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                                          <span className="text-xs text-[#4a6080]">{step}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <Dropzone
+                                      accept={{ "application/pdf": [".pdf"] }}
+                                      selectedFile={linkedinFile}
+                                      onFileSelect={setLinkedinFile}
+                                      label="Drop LinkedIn PDF here or click to upload"
+                                      sublabel="Exported profile PDF"
+                                    />
+                                    <button
+                                      onClick={() => setShowLinkedinExtra(v => !v)}
+                                      className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
+                                    >
+                                      <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", showLinkedinExtra && "rotate-90")} />
+                                      Have a recent job to add?
+                                    </button>
+                                    <AnimatePresence>
+                                      {showLinkedinExtra && (
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                                          <div className="p-3 bg-[#070c18] border border-[#1e304a] rounded-xl space-y-2">
+                                            <input type="text" placeholder="Company name" value={extraLinkedinExp.company} onChange={e => setExtraLinkedinExp(s => ({ ...s, company: e.target.value }))} className="card-input" />
+                                            <input type="text" placeholder="Your role / position" value={extraLinkedinExp.role} onChange={e => setExtraLinkedinExp(s => ({ ...s, role: e.target.value }))} className="card-input" />
+                                            <div className="flex gap-2">
+                                              <input type="text" placeholder="From" value={extraLinkedinExp.from} onChange={e => setExtraLinkedinExp(s => ({ ...s, from: e.target.value }))} className="card-input flex-1" />
+                                              <input type="text" placeholder="To" value={extraLinkedinExp.to} onChange={e => setExtraLinkedinExp(s => ({ ...s, to: e.target.value }))} className="card-input flex-1" />
+                                            </div>
+                                            <textarea placeholder="Key responsibilities..." value={extraLinkedinExp.responsibilities} onChange={e => setExtraLinkedinExp(s => ({ ...s, responsibilities: e.target.value }))} className="card-textarea min-h-[80px]" />
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
+                                )}
                               </div>
                             )}
 
@@ -946,6 +1154,7 @@ export default function Home() {
                   </div>
                   <div className="text-xs text-foreground/70 truncate">
                     {mode === "upload" && resumeFile ? resumeFile.name
+                      : mode === "linkedin" && linkedinImportType === "url" && linkedinProfile ? linkedinProfile.name || "LinkedIn Profile"
                       : mode === "linkedin" && linkedinFile ? linkedinFile.name
                       : mode === "scratch" ? `${scratchData.name || "Scratch"} — built manually`
                       : "Resume uploaded"}

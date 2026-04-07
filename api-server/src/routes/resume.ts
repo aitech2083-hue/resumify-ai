@@ -36,6 +36,18 @@ interface ScratchData {
   certifications?: string;
 }
 
+interface LinkedInImportProfile {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  headline?: string | null;
+  summary?: string | null;
+  experience?: Array<{ title: string; company: string; duration: string; highlights: string[] }>;
+  education?: Array<{ degree: string; institution: string; year?: string | null }>;
+  skills?: string[];
+}
+
 interface AtsScore {
   score: number;
   breakdown: string;
@@ -97,6 +109,36 @@ function buildScratchText(sd: ScratchData): string {
   }
 
   if (sd.certifications) out += `\nCERTIFICATIONS:\n${sd.certifications}\n`;
+  return out.trim();
+}
+
+function buildLinkedInProfileText(p: LinkedInImportProfile): string {
+  let out = "CANDIDATE PROFILE (from LinkedIn):\n";
+  if (p.name) out += `Name: ${p.name}\n`;
+  if (p.headline) out += `Headline: ${p.headline}\n`;
+  if (p.location) out += `Location: ${p.location}\n`;
+  if (p.email) out += `Email: ${p.email}\n`;
+  if (p.phone) out += `Phone: ${p.phone}\n`;
+  if (p.summary) out += `\nSummary:\n${p.summary}\n`;
+
+  if (p.experience && p.experience.length) {
+    out += "\nEXPERIENCE:\n";
+    p.experience.forEach(e => {
+      out += `${e.title} at ${e.company} (${e.duration})\n`;
+    });
+  }
+
+  if (p.education && p.education.length) {
+    out += "\nEDUCATION:\n";
+    p.education.forEach(e => {
+      const yr = e.year ? ` (${e.year})` : "";
+      out += `${e.degree} — ${e.institution}${yr}\n`;
+    });
+  }
+
+  if (p.skills && p.skills.length) {
+    out += `\nSKILLS: ${p.skills.join(", ")}\n`;
+  }
   return out.trim();
 }
 
@@ -455,14 +497,22 @@ router.post(
         return;
       }
       if (extra) additionalExperience = extra;
+    } else if (isLinkedIn && req.body.linkedinProfile) {
+      // LinkedIn URL import — profile JSON sent instead of a file
+      try {
+        const lp: LinkedInImportProfile = JSON.parse(req.body.linkedinProfile as string);
+        resumeText = buildLinkedInProfileText(lp);
+      } catch {
+        res.status(400).json({ error: "Invalid LinkedIn profile data." });
+        return;
+      }
+      if (extra) additionalExperience = extra;
     } else if (req.file) {
       if (req.file.mimetype === "application/pdf") {
         resumeB64 = req.file.buffer.toString("base64");
       } else {
         resumeText = req.file.buffer.toString("utf-8");
       }
-      // FIX: store extra separately instead of appending to resumeText
-      // This ensures it gets passed as MOST RECENT EXPERIENCE to the AI
       if (extra) additionalExperience = extra;
     } else {
       res.status(400).json({ error: "Upload a resume or use Build from Scratch." });
@@ -487,6 +537,105 @@ router.post(
     }
   },
 );
+
+// ── LinkedIn URL Import ───────────────────────────────────────────────────────
+router.post("/linkedin-import", async (req: Request, res: Response) => {
+  const { linkedinUrl } = req.body as { linkedinUrl?: string };
+
+  if (!linkedinUrl || !linkedinUrl.includes("linkedin.com/in/")) {
+    res.status(400).json({ error: "Invalid LinkedIn profile URL" });
+    return;
+  }
+
+  const token = process.env.APIFY_TOKEN;
+  if (!token) {
+    res.status(500).json({ error: "Apify token not configured" });
+    return;
+  }
+
+  try {
+    // Start the actor run
+    const runRes = await fetch(
+      `https://api.apify.com/v2/acts/harvestapi~linkedin-profile-scraper/runs?token=${token}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileUrls: [linkedinUrl],
+          profileScraperMode: "Short ($4 per 1k)",
+        }),
+      },
+    );
+
+    if (!runRes.ok) {
+      throw new Error("Failed to start Apify scraper");
+    }
+
+    // Wait 20 seconds for the scraper to finish
+    await new Promise(resolve => setTimeout(resolve, 20000));
+
+    // Poll for results up to 5 times (5s each)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let items: any[] = [];
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const dataRes = await fetch(
+        `https://api.apify.com/v2/acts/harvestapi~linkedin-profile-scraper/runs/last/dataset/items?token=${token}`,
+      );
+      if (dataRes.ok) {
+        items = await dataRes.json();
+        if (Array.isArray(items) && items.length > 0) break;
+      }
+      if (attempt < 4) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+
+    if (!items.length) {
+      res.status(504).json({ error: "Profile not found or private" });
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const item: any = items[0];
+
+    const profile: LinkedInImportProfile = {
+      name: [item.firstName, item.lastName].filter(Boolean).join(" ") || null,
+      email: item.email || null,
+      phone: item.phoneNumber || null,
+      location: item.location?.linkedinText || item.geoLocationName || null,
+      headline: item.headline || null,
+      summary: item.summary || null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      experience: (item.positions || item.currentPositions || []).map((p: any) => ({
+        title: p.title || "",
+        company: p.companyName || "",
+        duration:
+          (p.startEndDate?.start?.year
+            ? String(p.startEndDate.start.year) +
+              (p.startEndDate.start.month ? "/" + String(p.startEndDate.start.month) : "")
+            : "Unknown") +
+          " – " +
+          (p.startEndDate?.end?.year ? String(p.startEndDate.end.year) : "Present"),
+        highlights: [],
+      })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      education: (item.educations || []).map((e: any) => ({
+        degree: e.degreeName || e.fieldOfStudy || "",
+        institution: e.schoolName || "",
+        year: e.endDate?.year?.toString() || null,
+      })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      skills: (item.skills || []).map((s: any) => s.name || s).filter(Boolean).slice(0, 20),
+    };
+
+    res.json({ success: true, profile });
+  } catch (err) {
+    req.log.error({ err }, "LinkedIn import failed");
+    res.status(500).json({
+      error: err instanceof Error ? err.message : "Import failed",
+    });
+  }
+});
 
 // ── RezAI Agent — unified career coach endpoint ──────────────────────────────
 router.post(
