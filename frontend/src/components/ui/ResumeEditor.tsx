@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Code2, FormInput } from "lucide-react";
+import { Plus, Trash2, Code2, FormInput, Loader2, Check } from "lucide-react";
 import type { ResumeData, ExperienceEntry, SkillGroup, EducationEntry } from "@/lib/latex-resume";
 import { parseLatex, buildLatex } from "@/lib/latex-resume";
 
 interface ResumeEditorProps {
   latex: string;
-  onSave: (updatedLatex: string) => void;
+  onSave: (updatedLatex: string) => Promise<{ success: boolean; error?: string }>;
   saving?: boolean;
 }
 
@@ -56,10 +56,14 @@ function TextArea({ value, onChange, placeholder, rows = 3 }: {
   );
 }
 
-export function ResumeEditor({ latex, onSave, saving }: ResumeEditorProps) {
+type ApplyStatus = "idle" | "applying" | "success" | "error";
+
+export function ResumeEditor({ latex, onSave, saving: _saving }: ResumeEditorProps) {
   const [data, setData] = useState<ResumeData>(() => parseLatex(latex));
   const [rawMode, setRawMode] = useState(false);
   const [rawLatex, setRawLatex] = useState(latex);
+  const [applyStatus, setApplyStatus] = useState<ApplyStatus>("idle");
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   useEffect(() => {
     setData(parseLatex(latex));
@@ -70,12 +74,18 @@ export function ResumeEditor({ latex, onSave, saving }: ResumeEditorProps) {
     setData(prev => fn({ ...prev }));
   }, []);
 
-  const handleSave = () => {
-    if (rawMode) {
-      onSave(rawLatex);
+  const handleSave = async () => {
+    if (applyStatus === "applying") return;
+    setApplyStatus("applying");
+    setApplyError(null);
+    const latexToSave = rawMode ? rawLatex : buildLatex(data, latex);
+    const result = await onSave(latexToSave);
+    if (result.success) {
+      setApplyStatus("success");
+      setTimeout(() => setApplyStatus("idle"), 2000);
     } else {
-      const newLatex = buildLatex(data, latex);
-      onSave(newLatex);
+      setApplyStatus("error");
+      setApplyError(result.error ?? "Could not compile. Check LaTeX syntax.");
     }
   };
 
@@ -406,14 +416,34 @@ export function ResumeEditor({ latex, onSave, saving }: ResumeEditorProps) {
         </div>
       )}
 
-      <div className="flex-shrink-0 px-5 py-3 border-t border-border bg-surface/50 flex justify-end">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
-        >
-          {saving ? "Applying\u2026" : "Apply Changes & Preview"}
-        </button>
+      <div className="flex-shrink-0 px-5 py-3 border-t border-border bg-surface/50 space-y-2">
+        {applyStatus === "error" && applyError && (
+          <p className="text-xs text-destructive bg-destructive/10 border border-destructive/25 rounded-lg px-3 py-2">
+            {applyError}
+          </p>
+        )}
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={applyStatus === "applying"}
+            className={[
+              "px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all shadow-md",
+              applyStatus === "success"
+                ? "bg-success text-white"
+                : applyStatus === "error"
+                  ? "bg-destructive/90 text-white hover:bg-destructive"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90",
+              applyStatus === "applying" ? "opacity-70 cursor-not-allowed" : "",
+            ].join(" ")}
+          >
+            {applyStatus === "applying" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {applyStatus === "success" && <Check className="w-3.5 h-3.5" />}
+            {applyStatus === "applying" && "Applying…"}
+            {applyStatus === "success" && "✓ Applied!"}
+            {applyStatus === "error" && "Retry"}
+            {applyStatus === "idle" && "Apply Changes"}
+          </button>
+        </div>
       </div>
     </div>
   );
