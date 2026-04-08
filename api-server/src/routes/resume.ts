@@ -547,98 +547,73 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
     return;
   }
 
-  const token = process.env.APIFY_TOKEN;
-  if (!token) {
+  if (!process.env.APIFY_TOKEN) {
     res.status(500).json({ error: "Apify token not configured" });
     return;
   }
 
   try {
-    // Start the actor run
-    const runRes = await fetch(
-      `https://api.apify.com/v2/acts/apify~linkedin-profile-scraper/runs`,
+    const APIFY_TOKEN = process.env.APIFY_TOKEN;
+
+    const response = await fetch(
+      `https://api.apify.com/v2/acts/supreme_coder~linkedin-profile-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
       {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          profileUrls: [linkedinUrl],
-          profileScraperMode: "Short ($4 per 1k)",
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileUrls: [linkedinUrl] }),
       },
     );
 
-    if (!runRes.ok) {
-      console.error("Apify error status:", runRes.status);
-      console.error("Apify error body:", await runRes.text());
-      throw new Error("Failed to start Apify scraper");
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Apify error:", response.status, errorText);
+      res.status(502).json({ error: "Could not import this profile. Try PDF upload instead." });
+      return;
     }
 
-    // Wait 20 seconds for the scraper to finish
-    await new Promise(resolve => setTimeout(resolve, 20000));
+    const data = await response.json();
 
-    // Poll for results up to 5 times (5s each)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let items: any[] = [];
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const dataRes = await fetch(
-        `https://api.apify.com/v2/acts/apify~linkedin-profile-scraper/runs/last/dataset/items`,
-        { headers: { "Authorization": `Bearer ${token}` } },
-      );
-      if (dataRes.ok) {
-        items = await dataRes.json();
-        if (Array.isArray(items) && items.length > 0) break;
-      }
-      if (attempt < 4) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
-
-    if (!items.length) {
-      res.status(504).json({ error: "Profile not found or private" });
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      res.status(404).json({ error: "Profile not found or private. Make sure your profile is public." });
       return;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const item: any = items[0];
+    const item: any = data[0];
 
     const profile: LinkedInImportProfile = {
-      name: [item.firstName, item.lastName].filter(Boolean).join(" ") || null,
+      name: [item.firstName, item.lastName].filter(Boolean).join(" ") || item.fullName || null,
       email: item.email || null,
-      phone: item.phoneNumber || null,
-      location: item.location?.linkedinText || item.geoLocationName || null,
-      headline: item.headline || null,
-      summary: item.summary || null,
+      phone: item.phone || item.phoneNumber || null,
+      location: item.location || item.geoLocationName || item.addressWithCountry || null,
+      headline: item.headline || item.title || null,
+      summary: item.summary || item.about || null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      experience: (item.positions || item.currentPositions || []).map((p: any) => ({
-        title: p.title || "",
-        company: p.companyName || "",
-        duration:
-          (p.startEndDate?.start?.year
-            ? String(p.startEndDate.start.year) +
-              (p.startEndDate.start.month ? "/" + String(p.startEndDate.start.month) : "")
-            : "Unknown") +
-          " – " +
-          (p.startEndDate?.end?.year ? String(p.startEndDate.end.year) : "Present"),
+      experience: (item.positions || item.experience || item.workExperience || []).slice(0, 10).map((p: any) => ({
+        title: p.title || p.jobTitle || "",
+        company: p.companyName || p.company || p.organizationName || "",
+        duration: (() => {
+          const start = p.startDate?.year || p.dateRange?.start?.year || "";
+          const end = p.endDate?.year || p.dateRange?.end?.year || "Present";
+          return start ? `${start} – ${end}` : "Present";
+        })(),
         highlights: [],
       })),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      education: (item.educations || []).map((e: any) => ({
-        degree: e.degreeName || e.fieldOfStudy || "",
-        institution: e.schoolName || "",
-        year: e.endDate?.year?.toString() || null,
+      education: (item.educations || item.education || []).slice(0, 5).map((e: any) => ({
+        degree: e.degreeName || e.degree || e.fieldOfStudy || "",
+        institution: e.schoolName || e.school || e.institutionName || "",
+        year: e.endDate?.year?.toString() || e.dateRange?.end?.year?.toString() || null,
       })),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      skills: (item.skills || []).map((s: any) => s.name || s).filter(Boolean).slice(0, 20),
+      skills: (item.skills || []).slice(0, 20).map((s: any) => s.name || s.skillName || s).filter((s: any) => typeof s === "string" && s.length > 0),
     };
 
     res.json({ success: true, profile });
   } catch (err) {
-    req.log.error({ err }, "LinkedIn import failed");
+    console.error("LinkedIn import error:", err);
     res.status(500).json({
-      error: err instanceof Error ? err.message : "Import failed",
+      error: "Import failed. Please try again or use PDF upload.",
     });
   }
 });
