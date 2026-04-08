@@ -302,7 +302,11 @@ export default function Home() {
         setEditableLatex(prev => ({ ...prev, [tab]: data.latex }));
         setPreviewLoading(prev => ({ ...prev, [tab]: true }));
         compileLatexToBlob(data.latex).then(blob => {
-          if (blob) setPreviewBlobs(prev => ({ ...prev, [tab]: blob }));
+          if (blob) {
+            setPreviewBlobs(prev => ({ ...prev, [tab]: blob }));
+          } else {
+            console.warn("[RezAI Agent] LaTeX compilation returned null — PDF preview not updated");
+          }
           setPreviewLoading(prev => ({ ...prev, [tab]: false }));
         });
       }
@@ -1454,14 +1458,17 @@ export default function Home() {
                             ) : (
                               <ResumeEditor
                                 latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
-                                saving={previewLoading[activeJdTab]}
                                 onSave={async (updatedLatex: string) => {
                                   setEditableLatex(prev => ({ ...prev, [activeJdTab]: updatedLatex }));
                                   setPreviewLoading(prev => ({ ...prev, [activeJdTab]: true }));
                                   const blob = await compileLatexToBlob(updatedLatex);
-                                  if (blob) setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
                                   setPreviewLoading(prev => ({ ...prev, [activeJdTab]: false }));
+                                  if (!blob) {
+                                    return { success: false, error: "Could not compile. Check LaTeX syntax." };
+                                  }
+                                  setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
                                   setResumeViewMode("preview");
+                                  return { success: true };
                                 }}
                               />
                             )}
