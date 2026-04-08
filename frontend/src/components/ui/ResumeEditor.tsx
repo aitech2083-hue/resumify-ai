@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Code2, FormInput, Loader2, Check } from "lucide-react";
 import type { ResumeData, ExperienceEntry, SkillGroup, EducationEntry } from "@/lib/latex-resume";
-import { parseLatex, buildLatex } from "@/lib/latex-resume";
+import { parseLatex, patchLatex } from "@/lib/latex-resume";
 
 interface ResumeEditorProps {
   latex: string;
@@ -60,13 +60,17 @@ type ApplyStatus = "idle" | "applying" | "success" | "error";
 
 export function ResumeEditor({ latex, onSave, saving: _saving }: ResumeEditorProps) {
   const [data, setData] = useState<ResumeData>(() => parseLatex(latex));
+  // origData holds the parse snapshot at load/reset — needed for patchLatex diffs
+  const [origData, setOrigData] = useState<ResumeData>(() => parseLatex(latex));
   const [rawMode, setRawMode] = useState(false);
   const [rawLatex, setRawLatex] = useState(latex);
   const [applyStatus, setApplyStatus] = useState<ApplyStatus>("idle");
   const [applyError, setApplyError] = useState<string | null>(null);
 
   useEffect(() => {
-    setData(parseLatex(latex));
+    const parsed = parseLatex(latex);
+    setData(parsed);
+    setOrigData(parsed);
     setRawLatex(latex);
   }, [latex]);
 
@@ -78,9 +82,13 @@ export function ResumeEditor({ latex, onSave, saving: _saving }: ResumeEditorPro
     if (applyStatus === "applying") return;
     setApplyStatus("applying");
     setApplyError(null);
-    const latexToSave = rawMode ? rawLatex : buildLatex(data, latex);
+    // Visual mode: surgical patch — keeps all original LaTeX formatting intact
+    // Raw mode: send the full edited LaTeX as-is
+    const latexToSave = rawMode ? rawLatex : patchLatex(latex, origData, data);
     const result = await onSave(latexToSave);
     if (result.success) {
+      // Update origData baseline so next edit diffs against the saved state
+      setOrigData(data);
       setApplyStatus("success");
       setTimeout(() => setApplyStatus("idle"), 2000);
     } else {
@@ -188,7 +196,8 @@ export function ResumeEditor({ latex, onSave, saving: _saving }: ResumeEditorPro
           <button
             onClick={() => {
               if (!rawMode) {
-                setRawLatex(buildLatex(data, latex));
+                // When switching to raw mode, show the patched latex so far
+                setRawLatex(patchLatex(latex, origData, data));
               }
               setRawMode(true);
             }}

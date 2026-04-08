@@ -4,6 +4,8 @@ export interface ExperienceEntry {
   location: string;
   dates: string;
   bullets: string[];
+  /** Raw (un-cleaned) bullet text from original LaTeX — used by patchLatex */
+  _rawBullets?: string[];
 }
 
 export interface SkillGroup {
@@ -180,9 +182,13 @@ export function parseLatex(latex: string): ResumeData {
         }
 
         const itemMatches = [...block.matchAll(/\\item\s+(.+?)(?=\\item|\\end\{itemize\}|$)/gs)];
+        entry._rawBullets = [];
         for (const im of itemMatches) {
           const bullet = clean(im[1]);
-          if (bullet) entry.bullets.push(bullet);
+          if (bullet) {
+            entry.bullets.push(bullet);
+            entry._rawBullets.push(im[1].trimEnd());
+          }
         }
 
         if (entry.title) data.experience.push(entry);
@@ -262,6 +268,90 @@ export function parseLatex(latex: string): ResumeData {
   }
 
   return data;
+}
+
+/**
+ * Surgically patch only the changed fields inside the original LaTeX string,
+ * leaving all formatting/macros/preamble completely untouched.
+ * Used by the visual editor so compilation never breaks.
+ */
+export function patchLatex(baseLatex: string, origData: ResumeData, newData: ResumeData): string {
+  let result = baseLatex;
+
+  // ── Experience bullets ─────────────────────────────────────────────────────
+  for (let i = 0; i < Math.min(origData.experience.length, newData.experience.length); i++) {
+    const orig = origData.experience[i];
+    const edited = newData.experience[i];
+    const rawBullets = orig._rawBullets ?? [];
+
+    for (let j = 0; j < rawBullets.length; j++) {
+      if (j >= edited.bullets.length) break;
+      if (edited.bullets[j] === orig.bullets[j]) continue; // unchanged
+      // Replace the raw LaTeX bullet text with the new plain text (safely escaped)
+      const oldItem = `\\item ${rawBullets[j]}`;
+      const newItem = `\\item ${escSafe(edited.bullets[j])}`;
+      // String.replace replaces only the first match — correct for surgical edit
+      result = result.replace(oldItem, newItem);
+      // Update rawBullets so subsequent changes on same field keep working
+      rawBullets[j] = escSafe(edited.bullets[j]);
+    }
+
+    // ── Job title ──────────────────────────────────────────────────────────
+    if (edited.title !== orig.title) {
+      result = result.replace(
+        new RegExp(`\\\\textbf\\{${escRegex(orig.title)}\\}`, ""),
+        `\\textbf{${escSafe(edited.title)}}`
+      );
+    }
+
+    // ── Company ────────────────────────────────────────────────────────────
+    if (edited.company !== orig.company) {
+      result = result.replace(
+        new RegExp(`\\\\textit\\{${escRegex(orig.company)}\\}`, ""),
+        `\\textit{${escSafe(edited.company)}}`
+      );
+    }
+  }
+
+  // ── Skills ─────────────────────────────────────────────────────────────────
+  for (let i = 0; i < Math.min(origData.skills.length, newData.skills.length); i++) {
+    const orig = origData.skills[i];
+    const edited = newData.skills[i];
+    if (edited.items !== orig.items) {
+      result = result.replace(orig.items, escSafe(edited.items));
+    }
+    if (edited.category !== orig.category) {
+      result = result.replace(
+        new RegExp(`\\\\textbf\\{${escRegex(orig.category)}[: ]*\\}`, ""),
+        `\\textbf{${escSafe(edited.category)}:}`
+      );
+    }
+  }
+
+  // ── Education ──────────────────────────────────────────────────────────────
+  for (let i = 0; i < Math.min(origData.education.length, newData.education.length); i++) {
+    const orig = origData.education[i];
+    const edited = newData.education[i];
+    if (edited.degree !== orig.degree) {
+      result = result.replace(
+        new RegExp(`\\\\textbf\\{${escRegex(orig.degree)}\\}`, ""),
+        `\\textbf{${escSafe(edited.degree)}}`
+      );
+    }
+    if (edited.school !== orig.school) {
+      result = result.replace(
+        new RegExp(`\\\\textit\\{${escRegex(orig.school)}\\}`, ""),
+        `\\textit{${escSafe(edited.school)}}`
+      );
+    }
+  }
+
+  return result;
+}
+
+/** Escape a string for use inside a RegExp */
+function escRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function esc(s: string): string {

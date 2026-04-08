@@ -130,6 +130,55 @@ export default function Home() {
   const agentBottomRef = useRef<HTMLDivElement>(null);
   const agentBubbleBottomRef = useRef<HTMLDivElement>(null);
 
+  // -- Draggable bubble state --
+  const BUBBLE_MARGIN = 20;
+  const BUBBLE_SIZE = 56; // w-14 h-14
+  type Corner = "bottom-right" | "bottom-left" | "top-right" | "top-left";
+  const cornerToPos = (corner: Corner): { right?: number; left?: number; top?: number; bottom?: number } => {
+    const m = BUBBLE_MARGIN;
+    if (corner === "bottom-right") return { right: m, bottom: m };
+    if (corner === "bottom-left")  return { left: m,  bottom: m };
+    if (corner === "top-right")    return { right: m, top: m };
+    return                                { left: m,  top: m };
+  };
+  const loadBubbleCorner = (): Corner => {
+    try { return (localStorage.getItem("rezai-bubble-position") as Corner) || "bottom-right"; } catch { return "bottom-right"; }
+  };
+  const [bubbleCorner, setBubbleCorner] = useState<Corner>(loadBubbleCorner);
+  const [bubbleDragging, setBubbleDragging] = useState(false);
+  const [bubbleDragPos, setBubbleDragPos] = useState<{ x: number; y: number } | null>(null);
+  const bubbleDragStart = useRef<{ mx: number; my: number; ex: number; ey: number } | null>(null);
+
+  const handleBubblePointerDown = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    bubbleDragStart.current = { mx: e.clientX, my: e.clientY, ex: e.clientX, ey: e.clientY };
+    setBubbleDragging(false);
+  };
+  const handleBubblePointerMove = (e: React.PointerEvent) => {
+    if (!bubbleDragStart.current) return;
+    const dx = e.clientX - bubbleDragStart.current.mx;
+    const dy = e.clientY - bubbleDragStart.current.my;
+    if (!bubbleDragging && Math.hypot(dx, dy) < 4) return;
+    setBubbleDragging(true);
+    setBubbleDragPos({ x: e.clientX - BUBBLE_SIZE / 2, y: e.clientY - BUBBLE_SIZE / 2 });
+  };
+  const handleBubblePointerUp = (e: React.PointerEvent) => {
+    if (!bubbleDragging) { bubbleDragStart.current = null; return; }
+    // Snap to nearest corner
+    const cx = e.clientX;
+    const cy = e.clientY;
+    const midX = window.innerWidth / 2;
+    const midY = window.innerHeight / 2;
+    const corner: Corner = cx < midX
+      ? (cy < midY ? "top-left"    : "bottom-left")
+      : (cy < midY ? "top-right"   : "bottom-right");
+    setBubbleCorner(corner);
+    try { localStorage.setItem("rezai-bubble-position", corner); } catch {}
+    setBubbleDragging(false);
+    setBubbleDragPos(null);
+    bubbleDragStart.current = null;
+  };
+
   // -- Hooks --
   const generateMut = useGenerateResume();
   const { history, saveHistory, deleteHistory, clearHistory } = useHistory();
@@ -1670,9 +1719,15 @@ export default function Home() {
                   </AnimatePresence>
                 </div>
 
-                {/* ── FLOATING AGENT BUBBLE (absolute in right panel) ── */}
+                {/* ── FLOATING AGENT BUBBLE (draggable, snaps to corner) ── */}
                 {activeFeatureTab !== "agent" && (
-                  <div className="absolute bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+                  <div
+                    className={`absolute z-40 gap-3 ${bubbleCorner.endsWith("left") ? "items-start" : "items-end"} ${bubbleCorner.startsWith("top") ? "flex flex-col-reverse" : "flex flex-col"}`}
+                    style={bubbleDragging && bubbleDragPos
+                      ? { left: bubbleDragPos.x, top: bubbleDragPos.y, transition: "none", right: "auto", bottom: "auto" }
+                      : { ...cornerToPos(bubbleCorner), transition: "left 0.2s ease, right 0.2s ease, top 0.2s ease, bottom 0.2s ease" }
+                    }
+                  >
                     <AnimatePresence>
                       {agentOpen && (
                         <motion.div
@@ -1718,10 +1773,22 @@ export default function Home() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    <div className="relative">
-                      {!agentOpen && <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping pointer-events-none" style={{ animationDuration: "2s" }} />}
-                      <button onClick={() => setAgentOpen(v => !v)} title="Chat with RezAI Agent"
-                        className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 hover:bg-primary/90 hover:scale-105 active:scale-95 transition-all duration-200">
+                    <div
+                      className="relative"
+                      onPointerDown={handleBubblePointerDown}
+                      onPointerMove={handleBubblePointerMove}
+                      onPointerUp={handleBubblePointerUp}
+                      style={{ cursor: bubbleDragging ? "grabbing" : "grab", touchAction: "none" }}
+                      title="Drag to move · Click to open"
+                    >
+                      {!agentOpen && !bubbleDragging && (
+                        <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping pointer-events-none" style={{ animationDuration: "2s" }} />
+                      )}
+                      <button
+                        onClick={() => { if (!bubbleDragging) setAgentOpen(v => !v); }}
+                        className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 hover:bg-primary/90 transition-colors duration-200 select-none"
+                        style={{ pointerEvents: bubbleDragging ? "none" : "auto" }}
+                      >
                         {agentOpen ? <X className="w-6 h-6 text-[var(--rz-accent-text)]" /> : <Zap className="w-6 h-6 text-[var(--rz-accent-text)] fill-current" />}
                       </button>
                     </div>
