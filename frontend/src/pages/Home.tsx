@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Trash2, Plus, X,
-  ChevronRight, Copy, Check, FileCode2,
+  ChevronLeft, ChevronRight, Copy, Check, FileCode2,
   Briefcase, GraduationCap, LayoutTemplate,
   History, Eye, ExternalLink, Mail, MessageSquare,
   Download, Loader2, ChevronDown, Upload,
@@ -108,6 +108,7 @@ export default function Home() {
   // -- UI State --
   const [showChangingJd, setShowChangingJd] = useState(false);
   const [showSidebarExtra, setShowSidebarExtra] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [jobTrackerStage, setJobTrackerStage] = useState<string | null>(null);
   const [generateStep, setGenerateStep] = useState(-1);
   const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
@@ -1134,13 +1135,17 @@ export default function Home() {
               className="absolute inset-0 flex"
             >
 
-              {/* ── LEFT PANEL (280px) ── */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
-                className="w-[280px] flex-shrink-0 flex flex-col border-r border-[var(--rz-border)] bg-[var(--rz-surface)] overflow-y-auto custom-scrollbar"
-              >
+              {/* ── LEFT PANEL (280px, collapsible) ── */}
+              <div className="flex-shrink-0 relative" style={{ width: sidebarOpen ? "280px" : "0px", transition: "width 0.25s ease" }}>
+                {/* Overflow-hidden wrapper clips panel content when collapsed */}
+                <div className="absolute inset-0 overflow-hidden">
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="w-[280px] h-full flex flex-col border-r border-[var(--rz-border)] bg-[var(--rz-surface)] overflow-y-auto custom-scrollbar"
+                    style={{ opacity: sidebarOpen ? 1 : 0, transition: "opacity 0.2s ease" }}
+                  >
                 {/* Package ready */}
                 <div className="px-4 py-4 border-b border-[var(--rz-border)]">
                   <div className="flex items-center gap-1.5 mb-0.5">
@@ -1300,7 +1305,36 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-              </motion.div>
+                  </motion.div>
+                </div>
+                {/* Sidebar toggle button — sticks out at the right edge, always visible */}
+                <button
+                  onClick={() => setSidebarOpen(v => !v)}
+                  title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    right: "-20px",
+                    transform: "translateY(-50%)",
+                    width: "20px",
+                    height: "48px",
+                    background: "var(--rz-surface)",
+                    border: "1px solid var(--rz-border)",
+                    borderLeft: "none",
+                    borderRadius: "0 8px 8px 0",
+                    zIndex: 10,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--rz-muted)",
+                  }}
+                >
+                  {sidebarOpen
+                    ? <ChevronLeft className="w-3 h-3" />
+                    : <ChevronRight className="w-3 h-3" />}
+                </button>
+              </div>
 
               {/* ── RIGHT PANEL ── */}
               <motion.div
@@ -1544,7 +1578,7 @@ export default function Home() {
                                 <p className="text-xs text-[var(--rz-muted)]">Resume for {result.results[activeJdTab].company}</p>
                               </div>
                             </div>
-                            <div className="flex-1 overflow-hidden px-5">
+                            <div className="flex-1 overflow-hidden px-5 flex flex-col">
                               {renderAgentChat({ messages: agentMessages[activeJdTab] || [], loading: !!agentLoading[activeJdTab], bottomRef: agentBottomRef })}
                             </div>
                             <div className="flex-shrink-0 px-5 py-4 border-t border-[var(--rz-border)] bg-[var(--rz-bg)]">
@@ -1656,7 +1690,7 @@ export default function Home() {
                               <X className="w-4 h-4" />
                             </button>
                           </div>
-                          <div className="flex-1 overflow-hidden px-4">
+                          <div className="flex-1 overflow-hidden px-4 flex flex-col">
                             {renderAgentChat({ messages: agentMessages[activeJdTab] || [], loading: !!agentLoading[activeJdTab], bottomRef: agentBubbleBottomRef, compact: true })}
                           </div>
                           <div className="flex-shrink-0 px-3 pb-3 pt-2 border-t border-[var(--rz-border)] bg-[var(--rz-bg)] space-y-2">
