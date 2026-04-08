@@ -563,57 +563,117 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
     return;
   }
 
-  // Try 3 actors in sequence — each has different input schema
-  const actors = [
-    {
-      id: "supreme_coder~linkedin-profile-scraper",
-      body: { urls: [linkedinUrl] },
-    },
-    {
-      id: "harvestapi~linkedin-profile-scraper",
-      body: { profileUrls: [linkedinUrl] },
-    },
-    {
-      id: "bebity~linkedin-profile-scraper",
-      body: { profileUrls: [linkedinUrl] },
-    },
-  ];
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: any[] | null = null;
   let lastError = "";
 
-  for (const actor of actors) {
+  // --- Actor 1: supreme_coder (sync, urls as objects) ---
+  try {
+    console.log(`[LinkedIn import] Trying actor: supreme_coder~linkedin-profile-scraper`);
+    const res1 = await fetch(
+      `https://api.apify.com/v2/acts/supreme_coder~linkedin-profile-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls: [{ url: linkedinUrl }] }),
+      },
+    );
+    if (res1.ok) {
+      const result = await res1.json();
+      if (Array.isArray(result) && result.length > 0) {
+        console.log("[LinkedIn import] supreme_coder succeeded");
+        data = result;
+      } else {
+        console.warn("[LinkedIn import] supreme_coder returned empty result");
+        lastError = "supreme_coder returned empty dataset";
+      }
+    } else {
+      const errorText = await res1.text();
+      console.error(`[LinkedIn import] supreme_coder failed — status: ${res1.status}, body: ${errorText}`);
+      lastError = `supreme_coder returned ${res1.status}`;
+    }
+  } catch (e) {
+    console.error("[LinkedIn import] supreme_coder threw:", e);
+    lastError = `supreme_coder threw: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
+  // --- Actor 2: harvestapi (async: start run, then poll dataset) ---
+  if (!data) {
     try {
-      console.log(`[LinkedIn import] Trying actor: ${actor.id} for URL: ${linkedinUrl}`);
-      const response = await fetch(
-        `https://api.apify.com/v2/acts/${actor.id}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
+      console.log(`[LinkedIn import] Trying actor: harvestapi~linkedin-profile-scraper (async)`);
+      const startRes = await fetch(
+        `https://api.apify.com/v2/acts/harvestapi~linkedin-profile-scraper/runs?token=${APIFY_TOKEN}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(actor.body),
+          body: JSON.stringify({ profileUrls: [linkedinUrl] }),
         },
       );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[LinkedIn import] Actor ${actor.id} failed — status: ${response.status}, body: ${errorText}`);
-        lastError = `${actor.id} returned ${response.status}`;
-        continue;
-      }
-
-      const result = await response.json();
-      if (Array.isArray(result) && result.length > 0) {
-        console.log(`[LinkedIn import] Actor ${actor.id} succeeded`);
-        data = result;
-        break;
+      if (!startRes.ok) {
+        const errorText = await startRes.text();
+        console.error(`[LinkedIn import] harvestapi start failed — status: ${startRes.status}, body: ${errorText}`);
+        lastError = `harvestapi start returned ${startRes.status}`;
       } else {
-        console.warn(`[LinkedIn import] Actor ${actor.id} returned empty result`);
-        lastError = `${actor.id} returned empty dataset`;
+        const runData = await startRes.json();
+        const runId: string = runData?.data?.id;
+        console.log(`[LinkedIn import] harvestapi run started, id: ${runId}`);
+
+        // Poll up to 8 times with 5s intervals (40s total)
+        for (let attempt = 0; attempt < 8; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          const pollRes = await fetch(
+            `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}`,
+          );
+          if (pollRes.ok) {
+            const items = await pollRes.json();
+            if (Array.isArray(items) && items.length > 0) {
+              console.log(`[LinkedIn import] harvestapi succeeded on attempt ${attempt + 1}`);
+              data = items;
+              break;
+            }
+          }
+          console.log(`[LinkedIn import] harvestapi poll attempt ${attempt + 1} — no data yet`);
+        }
+        if (!data) {
+          lastError = "harvestapi returned empty after polling";
+          console.warn("[LinkedIn import] harvestapi returned empty after all polls");
+        }
       }
-    } catch (actorErr) {
-      console.error(`[LinkedIn import] Actor ${actor.id} threw:`, actorErr);
-      lastError = `${actor.id} threw: ${actorErr instanceof Error ? actorErr.message : String(actorErr)}`;
+    } catch (e) {
+      console.error("[LinkedIn import] harvestapi threw:", e);
+      lastError = `harvestapi threw: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+
+  // --- Actor 3: curious_coder (sync, profileUrls) ---
+  if (!data) {
+    try {
+      console.log(`[LinkedIn import] Trying actor: curious_coder~linkedin-profile-scraper`);
+      const res3 = await fetch(
+        `https://api.apify.com/v2/acts/curious_coder~linkedin-profile-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileUrls: [linkedinUrl] }),
+        },
+      );
+      if (res3.ok) {
+        const result = await res3.json();
+        if (Array.isArray(result) && result.length > 0) {
+          console.log("[LinkedIn import] curious_coder succeeded");
+          data = result;
+        } else {
+          console.warn("[LinkedIn import] curious_coder returned empty result");
+          lastError = "curious_coder returned empty dataset";
+        }
+      } else {
+        const errorText = await res3.text();
+        console.error(`[LinkedIn import] curious_coder failed — status: ${res3.status}, body: ${errorText}`);
+        lastError = `curious_coder returned ${res3.status}`;
+      }
+    } catch (e) {
+      console.error("[LinkedIn import] curious_coder threw:", e);
+      lastError = `curious_coder threw: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 
