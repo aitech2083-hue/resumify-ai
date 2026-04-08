@@ -540,44 +540,90 @@ router.post(
 
 // ── LinkedIn URL Import ───────────────────────────────────────────────────────
 router.post("/linkedin-import", async (req: Request, res: Response) => {
-  const { linkedinUrl } = req.body as { linkedinUrl?: string };
+  let { linkedinUrl } = req.body as { linkedinUrl?: string };
 
-  if (!linkedinUrl || !linkedinUrl.includes("linkedin.com/in/")) {
+  if (!linkedinUrl) {
     res.status(400).json({ error: "Invalid LinkedIn profile URL" });
     return;
   }
 
-  if (!process.env.APIFY_TOKEN) {
+  // Normalize URL — add https:// if missing
+  if (!linkedinUrl.startsWith("http")) {
+    linkedinUrl = "https://" + linkedinUrl;
+  }
+  if (!linkedinUrl.includes("linkedin.com/in/")) {
+    res.status(400).json({ error: "Invalid LinkedIn profile URL" });
+    return;
+  }
+
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  console.log("APIFY_TOKEN present:", !!APIFY_TOKEN, "length:", APIFY_TOKEN?.length ?? 0);
+  if (!APIFY_TOKEN) {
     res.status(500).json({ error: "Apify token not configured" });
     return;
   }
 
+  // Try 3 actors in sequence — each has different input schema
+  const actors = [
+    {
+      id: "supreme_coder~linkedin-profile-scraper",
+      body: { urls: [linkedinUrl] },
+    },
+    {
+      id: "harvestapi~linkedin-profile-scraper",
+      body: { profileUrls: [linkedinUrl] },
+    },
+    {
+      id: "bebity~linkedin-profile-scraper",
+      body: { profileUrls: [linkedinUrl] },
+    },
+  ];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: any[] | null = null;
+  let lastError = "";
+
+  for (const actor of actors) {
+    try {
+      console.log(`[LinkedIn import] Trying actor: ${actor.id} for URL: ${linkedinUrl}`);
+      const response = await fetch(
+        `https://api.apify.com/v2/acts/${actor.id}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(actor.body),
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[LinkedIn import] Actor ${actor.id} failed — status: ${response.status}, body: ${errorText}`);
+        lastError = `${actor.id} returned ${response.status}`;
+        continue;
+      }
+
+      const result = await response.json();
+      if (Array.isArray(result) && result.length > 0) {
+        console.log(`[LinkedIn import] Actor ${actor.id} succeeded`);
+        data = result;
+        break;
+      } else {
+        console.warn(`[LinkedIn import] Actor ${actor.id} returned empty result`);
+        lastError = `${actor.id} returned empty dataset`;
+      }
+    } catch (actorErr) {
+      console.error(`[LinkedIn import] Actor ${actor.id} threw:`, actorErr);
+      lastError = `${actor.id} threw: ${actorErr instanceof Error ? actorErr.message : String(actorErr)}`;
+    }
+  }
+
+  if (!data || data.length === 0) {
+    console.error(`[LinkedIn import] All actors failed. Last error: ${lastError}`);
+    res.status(404).json({ error: "Profile not found or private. Make sure your profile is public." });
+    return;
+  }
+
   try {
-    const APIFY_TOKEN = process.env.APIFY_TOKEN;
-
-    const response = await fetch(
-      `https://api.apify.com/v2/acts/supreme_coder~linkedin-profile-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileUrls: [linkedinUrl] }),
-      },
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Apify error:", response.status, errorText);
-      res.status(502).json({ error: "Could not import this profile. Try PDF upload instead." });
-      return;
-    }
-
-    const data = await response.json();
-
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      res.status(404).json({ error: "Profile not found or private. Make sure your profile is public." });
-      return;
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const item: any = data[0];
 
@@ -611,7 +657,7 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
 
     res.json({ success: true, profile });
   } catch (err) {
-    console.error("LinkedIn import error:", err);
+    console.error("LinkedIn import parse error:", err);
     res.status(500).json({
       error: "Import failed. Please try again or use PDF upload.",
     });
