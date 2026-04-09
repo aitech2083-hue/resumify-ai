@@ -190,16 +190,29 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
 
   const doParseLatex = async () => {
     if (parsedForLatex.current === latex && parseStatus === "done") return;
+
+    // Validate latex is present
+    const currentLatex = latex?.trim();
+    console.log("Sending latex to parse, length:", currentLatex?.length);
+    if (!currentLatex) {
+      setParseStatus("error");
+      return;
+    }
+
     setParseStatus("loading");
     try {
       const res = await fetch(`${BASE_URL}api/resume/parse-latex`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latex }),
+        body: JSON.stringify({ latex: currentLatex }),
       });
-      if (!res.ok) throw new Error("Parse failed");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        console.error("parse-latex API error:", errJson);
+        throw new Error(errJson?.error || "Parse failed");
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const json: { data: any } = await res.json();
+      const json: { success?: boolean; data: any } = await res.json();
       const d = json.data ?? {};
       setData({
         personalInfo: {
@@ -329,7 +342,7 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
             icon={<Code2 style={{ width: 13, height: 13 }} />} label="LaTeX (Advanced)" />
         </div>
         {mode === "visual" && parseStatus === "error" && (
-          <button onClick={doParseLatex} style={{ marginLeft: "auto", fontSize: "11px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px" }}>
+          <button onClick={() => { parsedForLatex.current = ""; doParseLatex(); }} style={{ marginLeft: "auto", fontSize: "11px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px" }}>
             <RefreshCw style={{ width: 12, height: 12 }} /> Retry
           </button>
         )}
@@ -349,16 +362,30 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           <p style={{ fontSize: "13px", margin: 0 }}>Loading editor…</p>
         </div>
 
-      /* ── Parse error ── */
-      ) : parseStatus === "error" ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", color: "#4a6080" }}>
-          <p style={{ fontSize: "13px", margin: 0 }}>Could not parse resume.</p>
-          <button onClick={doParseLatex} style={{ fontSize: "12px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
-        </div>
-
-      /* ── Visual editor ── */
+      /* ── Visual editor (parse error = show fallback empty form, or success = show populated form) ── */
       ) : (
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 0 20px" }} className="custom-scrollbar">
+
+          {/* No-latex banner */}
+          {!latex?.trim() && (
+            <div style={{ background: "#1a1f2e", border: "1px solid #f0a020", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "16px" }}>⚠️</span>
+              <p style={{ margin: 0, fontSize: "13px", color: "#f0a020" }}>No resume found. Please generate a resume first.</p>
+            </div>
+          )}
+
+          {/* Parse-failed fallback notice */}
+          {parseStatus === "error" && latex?.trim() && (
+            <div style={{ background: "#1a1f2e", border: "1px solid #3a5070", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "10px" }}>
+              <span style={{ fontSize: "16px", flexShrink: 0 }}>ℹ️</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#e2ddd4" }}>Could not auto-parse resume. You can fill in the fields manually below.</p>
+                <button onClick={() => { parsedForLatex.current = ""; doParseLatex(); }} style={{ fontSize: "12px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, display: "flex", alignItems: "center", gap: "4px" }}>
+                  <RefreshCw style={{ width: 12, height: 12 }} /> Try parsing again
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Personal Info */}
           <SectionCard title="Personal Information">
