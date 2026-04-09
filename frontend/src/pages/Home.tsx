@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Trash2, Plus, X,
-  ChevronLeft, ChevronRight, Copy, Check, FileCode2,
+  ChevronLeft, ChevronRight, Copy, Check, FileCode2, Pencil,
   Briefcase, GraduationCap, LayoutTemplate,
   History, Eye, ExternalLink, Mail, MessageSquare,
   Download, Loader2, ChevronDown, Upload,
@@ -1458,7 +1458,7 @@ export default function Home() {
                                 <Eye className="w-3.5 h-3.5" /> Preview
                               </button>
                               <button onClick={() => setResumeViewMode("edit")} className={cn("px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all", resumeViewMode === "edit" ? "bg-[var(--rz-bg)] text-foreground shadow-sm" : "text-[var(--rz-muted)] hover:text-foreground")}>
-                                <FileCode2 className="w-3.5 h-3.5" /> Edit LaTeX
+                                <Pencil className="w-3.5 h-3.5" /> Edit Resume
                               </button>
                             </div>
                             {/* Download + ATS badge */}
@@ -1501,19 +1501,20 @@ export default function Home() {
                               ) : (
                                 <div className="h-full flex flex-col items-center justify-center gap-3 bg-[var(--rz-surface)]/30">
                                   <FileCode2 className="w-10 h-10 text-[var(--rz-muted)]/40" />
-                                  <p className="text-sm text-[var(--rz-muted)]">Preview unavailable — switch to Edit LaTeX</p>
+                                  <p className="text-sm text-[var(--rz-muted)]">Preview unavailable — switch to Edit Resume</p>
                                 </div>
                               )
                             ) : (
                               <ResumeEditor
                                 latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
+                                jd={jds[activeJdTab]}
                                 onSave={async (updatedLatex: string) => {
                                   setEditableLatex(prev => ({ ...prev, [activeJdTab]: updatedLatex }));
                                   setPreviewLoading(prev => ({ ...prev, [activeJdTab]: true }));
                                   const blob = await compileLatexToBlob(updatedLatex);
                                   setPreviewLoading(prev => ({ ...prev, [activeJdTab]: false }));
                                   if (!blob) {
-                                    return { success: false, error: "Could not compile. Check LaTeX syntax." };
+                                    return { success: false, error: "Could not compile the resume. Please try again." };
                                   }
                                   setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
                                   setResumeViewMode("preview");

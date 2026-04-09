@@ -1,456 +1,560 @@
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Code2, FormInput, Loader2, Check } from "lucide-react";
-import type { ResumeData, ExperienceEntry, SkillGroup, EducationEntry } from "@/lib/latex-resume";
-import { parseLatex, patchLatex } from "@/lib/latex-resume";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Code2, Pencil, Loader2, Check, X, RefreshCw } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
 
-interface ResumeEditorProps {
-  latex: string;
-  onSave: (updatedLatex: string) => Promise<{ success: boolean; error?: string }>;
-  saving?: boolean;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface PersonalInfo {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedin: string;
 }
 
-function SectionHeader({ title }: { title: string }) {
+interface ExperienceEntry {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  bullets: string[];
+}
+
+interface EducationEntry {
+  id: string;
+  degree: string;
+  institution: string;
+  year: string;
+}
+
+interface VisualResumeData {
+  personalInfo: PersonalInfo;
+  summary: string;
+  experience: ExperienceEntry[];
+  education: EducationEntry[];
+  skills: string[];
+  certifications: string[];
+}
+
+export interface ResumeEditorProps {
+  latex: string;
+  jd?: { title?: string; company?: string; text?: string };
+  onSave: (updatedLatex: string) => Promise<{ success: boolean; error?: string }>;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const BASE_URL = import.meta.env.BASE_URL || "/";
+
+const EMPTY_DATA: VisualResumeData = {
+  personalInfo: { name: "", email: "", phone: "", location: "", linkedin: "" },
+  summary: "",
+  experience: [],
+  education: [],
+  skills: [],
+  certifications: [],
+};
+
+// ─── Input styles (inline to avoid CSS specificity issues) ────────────────────
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  background: "#070c18",
+  border: "1px solid #1e304a",
+  borderRadius: "8px",
+  padding: "10px 14px",
+  fontSize: "13px",
+  color: "#e2ddd4",
+  outline: "none",
+  transition: "border-color 0.15s",
+  boxSizing: "border-box",
+  fontFamily: "inherit",
+};
+
+const focusHandlers = {
+  onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    e.currentTarget.style.borderColor = "#f0a020";
+  },
+  onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    e.currentTarget.style.borderColor = "#1e304a";
+  },
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SectionCard({ title, action, children }: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center gap-2 mt-6 mb-3 first:mt-0">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-primary">{title}</h3>
-      <div className="flex-1 h-px bg-border" />
+    <div style={{ background: "#0c1626", border: "1px solid #1e304a", borderRadius: "12px", padding: "20px", marginBottom: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#3a5070" }}>
+          {title}
+        </span>
+        {action}
+      </div>
+      {children}
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs font-medium text-muted-foreground mb-1">{children}</label>;
-}
-
-function Input({ value, onChange, placeholder, className = "" }: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  className?: string;
-}) {
   return (
-    <input
-      type="text"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={`w-full bg-[#0d1117] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground/50 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all ${className}`}
-    />
+    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#4a6080", marginBottom: "5px" }}>
+      {children}
+    </label>
   );
 }
 
-function TextArea({ value, onChange, placeholder, rows = 3 }: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  rows?: number;
+function EditorInput({ value, onChange, placeholder, type = "text" }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
 }) {
   return (
-    <textarea
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      className="w-full bg-[#0d1117] border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-muted-foreground/50 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
-    />
+    <input type={type} value={value} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} style={inputStyle} {...focusHandlers} />
   );
 }
 
-type ApplyStatus = "idle" | "applying" | "success" | "error";
+function EditorTextarea({ value, onChange, placeholder, rows = 2 }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+}) {
+  return (
+    <textarea value={value} onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} rows={rows}
+      style={{ ...inputStyle, resize: "vertical" }} {...focusHandlers} />
+  );
+}
 
-export function ResumeEditor({ latex, onSave, saving: _saving }: ResumeEditorProps) {
-  const [data, setData] = useState<ResumeData>(() => parseLatex(latex));
-  // origData holds the parse snapshot at load/reset — needed for patchLatex diffs
-  const [origData, setOrigData] = useState<ResumeData>(() => parseLatex(latex));
-  const [rawMode, setRawMode] = useState(false);
+function AddBtn({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button onClick={onClick} style={{ background: "none", border: "none", color: "#f0a020", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: "2px 0", fontFamily: "inherit" }}>
+      <Plus style={{ width: 13, height: 13 }} /> {label}
+    </button>
+  );
+}
+
+function RemoveBtn({ onClick }: { onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ background: "none", border: "none", cursor: "pointer", color: hover ? "#ef4444" : "#3a5070", padding: 0, display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", fontFamily: "inherit", transition: "color 0.15s", flexShrink: 0 }}>
+      <Trash2 style={{ width: 12, height: 12 }} /> Remove
+    </button>
+  );
+}
+
+function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button onClick={onClick}
+      style={{ display: "flex", alignItems: "center", gap: "5px", padding: "5px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", background: active ? "#1e304a" : "transparent", color: active ? "#e2ddd4" : "#4a6080" }}>
+      {icon} {label}
+    </button>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+type ParseStatus = "idle" | "loading" | "done" | "error";
+type UpdateStatus = "idle" | "updating" | "success" | "error";
+
+export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
+  const [mode, setMode] = useState<"visual" | "latex">("visual");
+  const [data, setData] = useState<VisualResumeData>(EMPTY_DATA);
   const [rawLatex, setRawLatex] = useState(latex);
-  const [applyStatus, setApplyStatus] = useState<ApplyStatus>("idle");
-  const [applyError, setApplyError] = useState<string | null>(null);
+  const [parseStatus, setParseStatus] = useState<ParseStatus>("idle");
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [skillInput, setSkillInput] = useState("");
+  const [certInput, setCertInput] = useState("");
+  const parsedForLatex = useRef<string>("");
 
+  // Auto-parse when entering visual mode for the first time
   useEffect(() => {
-    const parsed = parseLatex(latex);
-    setData(parsed);
-    setOrigData(parsed);
+    if (mode !== "visual" || parseStatus !== "idle") return;
+    doParseLatex();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, parseStatus]);
+
+  // Reset parse state when latex prop changes (e.g. after agent edit)
+  useEffect(() => {
     setRawLatex(latex);
+    if (parsedForLatex.current !== latex) {
+      setParseStatus("idle");
+      parsedForLatex.current = "";
+    }
   }, [latex]);
 
-  const update = useCallback((fn: (d: ResumeData) => ResumeData) => {
-    setData(prev => fn({ ...prev }));
-  }, []);
-
-  const handleSave = async () => {
-    if (applyStatus === "applying") return;
-    setApplyStatus("applying");
-    setApplyError(null);
-    // Visual mode: surgical patch — keeps all original LaTeX formatting intact
-    // Raw mode: send the full edited LaTeX as-is
-    const latexToSave = rawMode ? rawLatex : patchLatex(latex, origData, data);
-    const result = await onSave(latexToSave);
-    if (result.success) {
-      // Update origData baseline so next edit diffs against the saved state
-      setOrigData(data);
-      setApplyStatus("success");
-      setTimeout(() => setApplyStatus("idle"), 2000);
-    } else {
-      setApplyStatus("error");
-      setApplyError(result.error ?? "Could not compile. Check LaTeX syntax.");
+  const doParseLatex = async () => {
+    if (parsedForLatex.current === latex && parseStatus === "done") return;
+    setParseStatus("loading");
+    try {
+      const res = await fetch(`${BASE_URL}api/resume/parse-latex`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latex }),
+      });
+      if (!res.ok) throw new Error("Parse failed");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json: { data: any } = await res.json();
+      const d = json.data ?? {};
+      setData({
+        personalInfo: {
+          name: d.personalInfo?.name || "",
+          email: d.personalInfo?.email || "",
+          phone: d.personalInfo?.phone || "",
+          location: d.personalInfo?.location || "",
+          linkedin: d.personalInfo?.linkedin || "",
+        },
+        summary: d.summary || "",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        experience: (d.experience || []).map((e: any) => ({
+          id: e.id || uuidv4(),
+          title: e.title || "",
+          company: e.company || "",
+          location: e.location || "",
+          startDate: e.startDate || "",
+          endDate: e.endDate || "",
+          bullets: Array.isArray(e.bullets) ? e.bullets.filter(Boolean) : [],
+        })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        education: (d.education || []).map((e: any) => ({
+          id: e.id || uuidv4(),
+          degree: e.degree || "",
+          institution: e.institution || "",
+          year: e.year || "",
+        })),
+        skills: Array.isArray(d.skills) ? d.skills.filter(Boolean) : [],
+        certifications: Array.isArray(d.certifications) ? d.certifications.filter(Boolean) : [],
+      });
+      parsedForLatex.current = latex;
+      setParseStatus("done");
+    } catch {
+      setParseStatus("error");
     }
   };
 
-  const updateExp = (idx: number, field: keyof ExperienceEntry, value: any) => {
-    update(d => {
-      const exp = [...d.experience];
-      exp[idx] = { ...exp[idx], [field]: value };
-      return { ...d, experience: exp };
-    });
-  };
+  // ── State helpers ──────────────────────────────────────────────────────────
 
-  const updateBullet = (expIdx: number, bulletIdx: number, value: string) => {
-    update(d => {
-      const exp = [...d.experience];
-      const bullets = [...exp[expIdx].bullets];
-      bullets[bulletIdx] = value;
-      exp[expIdx] = { ...exp[expIdx], bullets };
-      return { ...d, experience: exp };
-    });
+  const updExp = (id: string, field: keyof ExperienceEntry, value: string) =>
+    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, [field]: value } : e) }));
+  const updExpBullet = (id: string, bi: number, v: string) =>
+    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.map((b, i) => i === bi ? v : b) } : e) }));
+  const addExpBullet = (id: string) =>
+    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: [...e.bullets, ""] } : e) }));
+  const removeExpBullet = (id: string, bi: number) =>
+    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.filter((_, i) => i !== bi) } : e) }));
+  const addExperience = () =>
+    setData(d => ({ ...d, experience: [...d.experience, { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""] }] }));
+  const removeExperience = (id: string) => {
+    if (!confirm("Remove this experience entry?")) return;
+    setData(d => ({ ...d, experience: d.experience.filter(e => e.id !== id) }));
   };
-
-  const addBullet = (expIdx: number) => {
-    update(d => {
-      const exp = [...d.experience];
-      exp[expIdx] = { ...exp[expIdx], bullets: [...exp[expIdx].bullets, ""] };
-      return { ...d, experience: exp };
-    });
-  };
-
-  const removeBullet = (expIdx: number, bulletIdx: number) => {
-    update(d => {
-      const exp = [...d.experience];
-      const bullets = exp[expIdx].bullets.filter((_, i) => i !== bulletIdx);
-      exp[expIdx] = { ...exp[expIdx], bullets };
-      return { ...d, experience: exp };
-    });
-  };
-
-  const addExperience = () => {
-    update(d => ({
-      ...d,
-      experience: [...d.experience, { title: "", company: "", location: "", dates: "", bullets: [""] }],
-    }));
-  };
-
-  const removeExperience = (idx: number) => {
-    update(d => ({
-      ...d,
-      experience: d.experience.filter((_, i) => i !== idx),
-    }));
-  };
-
-  const updateSkill = (idx: number, field: keyof SkillGroup, value: string) => {
-    update(d => {
-      const skills = [...d.skills];
-      skills[idx] = { ...skills[idx], [field]: value };
-      return { ...d, skills };
-    });
-  };
-
+  const updEdu = (id: string, field: keyof EducationEntry, v: string) =>
+    setData(d => ({ ...d, education: d.education.map(e => e.id === id ? { ...e, [field]: v } : e) }));
+  const addEducation = () =>
+    setData(d => ({ ...d, education: [...d.education, { id: uuidv4(), degree: "", institution: "", year: "" }] }));
+  const removeEducation = (id: string) =>
+    setData(d => ({ ...d, education: d.education.filter(e => e.id !== id) }));
   const addSkill = () => {
-    update(d => ({ ...d, skills: [...d.skills, { category: "", items: "" }] }));
+    const s = skillInput.trim();
+    if (!s || data.skills.includes(s)) { setSkillInput(""); return; }
+    setData(d => ({ ...d, skills: [...d.skills, s] }));
+    setSkillInput("");
+  };
+  const removeSkill = (s: string) => setData(d => ({ ...d, skills: d.skills.filter(x => x !== s) }));
+  const addCert = () => {
+    const c = certInput.trim();
+    if (!c) return;
+    setData(d => ({ ...d, certifications: [...d.certifications, c] }));
+    setCertInput("");
+  };
+  const removeCert = (i: number) => setData(d => ({ ...d, certifications: d.certifications.filter((_, idx) => idx !== i) }));
+
+  // ── Update Preview ─────────────────────────────────────────────────────────
+
+  const handleUpdate = async () => {
+    if (updateStatus === "updating") return;
+    setUpdateStatus("updating");
+    setUpdateError(null);
+    try {
+      if (mode === "latex") {
+        const result = await onSave(rawLatex);
+        if (result.success) { setUpdateStatus("success"); setTimeout(() => setUpdateStatus("idle"), 2000); }
+        else { setUpdateStatus("error"); setUpdateError(result.error || "Compilation failed."); }
+        return;
+      }
+      // Visual mode: ask Claude to regenerate full LaTeX from structured data
+      const regenRes = await fetch(`${BASE_URL}api/resume/regenerate-from-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeData: data, jd, originalLatex: latex }),
+      });
+      if (!regenRes.ok) {
+        const err = await regenRes.json().catch(() => null);
+        throw new Error(err?.error || "Regeneration failed.");
+      }
+      const { latex: newLatex } = await regenRes.json();
+      const result = await onSave(newLatex);
+      if (result.success) { setUpdateStatus("success"); setTimeout(() => setUpdateStatus("idle"), 2500); }
+      else { setUpdateStatus("error"); setUpdateError(result.error || "Could not compile the generated resume."); }
+    } catch (e: unknown) {
+      setUpdateStatus("error");
+      setUpdateError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    }
   };
 
-  const removeSkill = (idx: number) => {
-    update(d => ({ ...d, skills: d.skills.filter((_, i) => i !== idx) }));
+  const handleReset = () => {
+    setParseStatus("idle");
+    parsedForLatex.current = "";
+    setData(EMPTY_DATA);
+    setUpdateStatus("idle");
+    setUpdateError(null);
   };
 
-  const updateEdu = (idx: number, field: keyof EducationEntry, value: string) => {
-    update(d => {
-      const education = [...d.education];
-      education[idx] = { ...education[idx], [field]: value };
-      return { ...d, education };
-    });
-  };
-
-  const addEducation = () => {
-    update(d => ({
-      ...d,
-      education: [...d.education, { degree: "", school: "", location: "", dates: "", details: "" }],
-    }));
-  };
-
-  const removeEducation = (idx: number) => {
-    update(d => ({ ...d, education: d.education.filter((_, i) => i !== idx) }));
-  };
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-border/50">
-        <div className="flex items-center gap-1 bg-surface/50 rounded-lg p-0.5">
-          <button
-            onClick={() => setRawMode(false)}
-            className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
-              !rawMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <FormInput className="w-3.5 h-3.5" /> Visual
-          </button>
-          <button
-            onClick={() => {
-              if (!rawMode) {
-                // When switching to raw mode, show the patched latex so far
-                setRawLatex(patchLatex(latex, origData, data));
-              }
-              setRawMode(true);
-            }}
-            className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${
-              rawMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Code2 className="w-3.5 h-3.5" /> LaTeX
-          </button>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#070c18" }}>
+
+      {/* ── Tab bar ── */}
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "8px 16px", borderBottom: "1px solid #1e304a", background: "#0c1626", gap: "4px" }}>
+        <div style={{ display: "flex", gap: "2px", background: "#070c18", borderRadius: "8px", padding: "3px" }}>
+          <TabButton active={mode === "visual"} onClick={() => setMode("visual")}
+            icon={<Pencil style={{ width: 13, height: 13 }} />} label="Edit Resume" />
+          <TabButton active={mode === "latex"} onClick={() => { setRawLatex(latex); setMode("latex"); }}
+            icon={<Code2 style={{ width: 13, height: 13 }} />} label="LaTeX (Advanced)" />
         </div>
+        {mode === "visual" && parseStatus === "error" && (
+          <button onClick={doParseLatex} style={{ marginLeft: "auto", fontSize: "11px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px" }}>
+            <RefreshCw style={{ width: 12, height: 12 }} /> Retry
+          </button>
+        )}
       </div>
 
-      {rawMode ? (
-        <textarea
-          value={rawLatex}
-          onChange={e => setRawLatex(e.target.value)}
-          className="flex-1 w-full bg-[#0d1117] text-[#c9d1d9] font-mono text-sm leading-relaxed p-5 resize-none outline-none border-0 custom-scrollbar"
-          spellCheck={false}
-          placeholder="% LaTeX resume source"
-        />
+      {/* ── LaTeX mode ── */}
+      {mode === "latex" ? (
+        <textarea value={rawLatex} onChange={e => setRawLatex(e.target.value)}
+          style={{ flex: 1, width: "100%", background: "#0d1117", color: "#c9d1d9", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6, padding: "20px", resize: "none", outline: "none", border: "none" }}
+          spellCheck={false} placeholder="% LaTeX resume source"
+          className="custom-scrollbar" />
+
+      /* ── Loading ── */
+      ) : parseStatus === "loading" ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px", color: "#4a6080" }}>
+          <Loader2 style={{ width: 28, height: 28 }} className="animate-spin" />
+          <p style={{ fontSize: "13px", margin: 0 }}>Loading editor…</p>
+        </div>
+
+      /* ── Parse error ── */
+      ) : parseStatus === "error" ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", color: "#4a6080" }}>
+          <p style={{ fontSize: "13px", margin: 0 }}>Could not parse resume.</p>
+          <button onClick={doParseLatex} style={{ fontSize: "12px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Try again</button>
+        </div>
+
+      /* ── Visual editor ── */
       ) : (
-        <div className="flex-1 overflow-y-auto p-5 space-y-1 custom-scrollbar">
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 0 20px" }} className="custom-scrollbar">
 
-          <SectionHeader title="Personal Info" />
-          <div className="space-y-2">
-            <div>
-              <FieldLabel>Full Name</FieldLabel>
-              <Input value={data.name} onChange={v => update(d => ({ ...d, name: v }))} placeholder="John Doe" />
-            </div>
-            <div>
-              <FieldLabel>Contact (email, phone, location, LinkedIn — separated by |)</FieldLabel>
-              <Input value={data.contactLine} onChange={v => update(d => ({ ...d, contactLine: v }))} placeholder="john@email.com | (555) 123-4567 | City, State" />
-            </div>
-          </div>
-
-          <SectionHeader title="Professional Summary" />
-          <TextArea
-            value={data.summary}
-            onChange={v => update(d => ({ ...d, summary: v }))}
-            placeholder="Experienced software engineer with 8+ years..."
-            rows={4}
-          />
-
-          <SectionHeader title="Work Experience" />
-          {data.experience.map((exp, i) => (
-            <div key={i} className="bg-surface/30 border border-border rounded-xl p-4 mb-3 space-y-2 group relative">
-              <button
-                onClick={() => removeExperience(i)}
-                className="absolute top-3 right-3 p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove entry"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <FieldLabel>Job Title</FieldLabel>
-                  <Input value={exp.title} onChange={v => updateExp(i, "title", v)} placeholder="Software Engineer" />
-                </div>
-                <div>
-                  <FieldLabel>Dates</FieldLabel>
-                  <Input value={exp.dates} onChange={v => updateExp(i, "dates", v)} placeholder="Jan 2020 – Present" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <FieldLabel>Company</FieldLabel>
-                  <Input value={exp.company} onChange={v => updateExp(i, "company", v)} placeholder="Google" />
-                </div>
-                <div>
-                  <FieldLabel>Location</FieldLabel>
-                  <Input value={exp.location} onChange={v => updateExp(i, "location", v)} placeholder="Mountain View, CA" />
-                </div>
+          {/* Personal Info */}
+          <SectionCard title="Personal Information">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <FieldLabel>Full Name</FieldLabel>
+                <EditorInput value={data.personalInfo.name} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, name: v } }))} placeholder="John Doe" />
               </div>
               <div>
-                <FieldLabel>Achievements / Bullets</FieldLabel>
-                <div className="space-y-1.5">
-                  {exp.bullets.map((bullet, bi) => (
-                    <div key={bi} className="flex gap-2 items-start">
-                      <span className="mt-2.5 text-muted-foreground/40 text-xs">{"\u2022"}</span>
-                      <textarea
-                        value={bullet}
-                        onChange={e => updateBullet(i, bi, e.target.value)}
-                        rows={2}
-                        className="flex-1 bg-[#0d1117] border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
-                        placeholder="Accomplished [X] by [Y], resulting in [Z]"
-                      />
-                      <button
-                        onClick={() => removeBullet(i, bi)}
-                        className="mt-2 p-1 text-muted-foreground/40 hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                <FieldLabel>Email</FieldLabel>
+                <EditorInput value={data.personalInfo.email} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, email: v } }))} placeholder="john@example.com" type="email" />
+              </div>
+              <div>
+                <FieldLabel>Phone</FieldLabel>
+                <EditorInput value={data.personalInfo.phone} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, phone: v } }))} placeholder="+1 (555) 000-0000" />
+              </div>
+              <div>
+                <FieldLabel>Location</FieldLabel>
+                <EditorInput value={data.personalInfo.location} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, location: v } }))} placeholder="New York, NY" />
+              </div>
+              <div>
+                <FieldLabel>LinkedIn URL</FieldLabel>
+                <EditorInput value={data.personalInfo.linkedin} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, linkedin: v } }))} placeholder="linkedin.com/in/johndoe" />
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Summary */}
+          <SectionCard title="Professional Summary">
+            <EditorTextarea value={data.summary} onChange={v => setData(d => ({ ...d, summary: v }))} placeholder="Results-driven professional with…" rows={4} />
+          </SectionCard>
+
+          {/* Experience */}
+          <SectionCard title="Work Experience" action={<AddBtn onClick={addExperience} label="+ Add" />}>
+            {data.experience.length === 0 && (
+              <p style={{ fontSize: "12px", color: "#4a6080", textAlign: "center", padding: "16px 0", margin: 0 }}>No experience entries. Click "+ Add" to add one.</p>
+            )}
+            {data.experience.map(exp => (
+              <div key={exp.id} style={{ background: "#070c18", border: "1px solid #1e304a", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                  <div>
+                    <FieldLabel>Job Title</FieldLabel>
+                    <EditorInput value={exp.title} onChange={v => updExp(exp.id, "title", v)} placeholder="Software Engineer" />
+                  </div>
+                  <div>
+                    <FieldLabel>Company</FieldLabel>
+                    <EditorInput value={exp.company} onChange={v => updExp(exp.id, "company", v)} placeholder="Google" />
+                  </div>
+                  <div>
+                    <FieldLabel>Location</FieldLabel>
+                    <EditorInput value={exp.location} onChange={v => updExp(exp.id, "location", v)} placeholder="Mountain View, CA" />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                    <div>
+                      <FieldLabel>Start</FieldLabel>
+                      <EditorInput value={exp.startDate} onChange={v => updExp(exp.id, "startDate", v)} placeholder="Jan 2022" />
                     </div>
-                  ))}
-                  <button
-                    onClick={() => addBullet(i)}
-                    className="text-xs text-primary/70 hover:text-primary flex items-center gap-1 mt-1 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add bullet
+                    <div>
+                      <FieldLabel>End</FieldLabel>
+                      <EditorInput value={exp.endDate} onChange={v => updExp(exp.id, "endDate", v)} placeholder="Present" />
+                    </div>
+                  </div>
+                </div>
+                <FieldLabel>Bullet points</FieldLabel>
+                {exp.bullets.map((b, bi) => (
+                  <div key={bi} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "6px" }}>
+                    <span style={{ color: "#4a6080", marginTop: "13px", fontSize: "13px", flexShrink: 0 }}>•</span>
+                    <EditorTextarea value={b} onChange={v => updExpBullet(exp.id, bi, v)} placeholder="Accomplished [X] by [Y], resulting in [Z]" rows={2} />
+                    <button onClick={() => removeExpBullet(exp.id, bi)}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#3a5070", padding: "12px 0 0 0", flexShrink: 0, transition: "color 0.15s" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#3a5070"; }}>
+                      <Trash2 style={{ width: 13, height: 13 }} />
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                  <AddBtn onClick={() => addExpBullet(exp.id)} label="+ Add bullet" />
+                  <RemoveBtn onClick={() => removeExperience(exp.id)} />
+                </div>
+              </div>
+            ))}
+          </SectionCard>
+
+          {/* Education */}
+          <SectionCard title="Education" action={<AddBtn onClick={addEducation} label="+ Add" />}>
+            {data.education.length === 0 && (
+              <p style={{ fontSize: "12px", color: "#4a6080", textAlign: "center", padding: "16px 0", margin: 0 }}>No education entries. Click "+ Add" to add one.</p>
+            )}
+            {data.education.map(edu => (
+              <div key={edu.id} style={{ background: "#070c18", border: "1px solid #1e304a", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                  <div>
+                    <FieldLabel>Degree</FieldLabel>
+                    <EditorInput value={edu.degree} onChange={v => updEdu(edu.id, "degree", v)} placeholder="B.S. Computer Science" />
+                  </div>
+                  <div>
+                    <FieldLabel>Year</FieldLabel>
+                    <EditorInput value={edu.year} onChange={v => updEdu(edu.id, "year", v)} placeholder="2020" />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <FieldLabel>Institution</FieldLabel>
+                    <EditorInput value={edu.institution} onChange={v => updEdu(edu.id, "institution", v)} placeholder="MIT" />
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <RemoveBtn onClick={() => removeEducation(edu.id)} />
+                </div>
+              </div>
+            ))}
+          </SectionCard>
+
+          {/* Skills */}
+          <SectionCard title="Skills">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
+              {data.skills.map(skill => (
+                <span key={skill} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#1e304a", border: "1px solid #2e4060", borderRadius: "20px", padding: "4px 10px 4px 12px", fontSize: "12px", color: "#e2ddd4" }}>
+                  {skill}
+                  <button onClick={() => removeSkill(skill)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#4a6080", padding: 0, lineHeight: 1, display: "flex", alignItems: "center", transition: "color 0.15s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#4a6080"; }}>
+                    <X style={{ width: 11, height: 11 }} />
                   </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          <button
-            onClick={addExperience}
-            className="w-full py-2.5 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:text-primary hover:border-primary/50 flex items-center justify-center gap-2 transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Experience
-          </button>
-
-          <SectionHeader title="Skills" />
-          {data.skills.map((sg, i) => (
-            <div key={i} className="flex gap-2 items-start mb-2 group">
-              <div className="w-1/3">
-                <Input value={sg.category} onChange={v => updateSkill(i, "category", v)} placeholder="Category" />
-              </div>
-              <div className="flex-1">
-                <Input value={sg.items} onChange={v => updateSkill(i, "items", v)} placeholder="Python, JavaScript, React, ..." />
-              </div>
-              <button
-                onClick={() => removeSkill(i)}
-                className="mt-2 p-1 text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-          <button
-            onClick={addSkill}
-            className="text-xs text-primary/70 hover:text-primary flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add skill category
-          </button>
-
-          <SectionHeader title="Education" />
-          {data.education.map((edu, i) => (
-            <div key={i} className="bg-surface/30 border border-border rounded-xl p-4 mb-3 space-y-2 group relative">
-              <button
-                onClick={() => removeEducation(i)}
-                className="absolute top-3 right-3 p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <FieldLabel>Degree</FieldLabel>
-                  <Input value={edu.degree} onChange={v => updateEdu(i, "degree", v)} placeholder="BS Computer Science" />
-                </div>
-                <div>
-                  <FieldLabel>Dates</FieldLabel>
-                  <Input value={edu.dates} onChange={v => updateEdu(i, "dates", v)} placeholder="2016 – 2020" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <FieldLabel>School</FieldLabel>
-                  <Input value={edu.school} onChange={v => updateEdu(i, "school", v)} placeholder="MIT" />
-                </div>
-                <div>
-                  <FieldLabel>Location</FieldLabel>
-                  <Input value={edu.location} onChange={v => updateEdu(i, "location", v)} placeholder="Cambridge, MA" />
-                </div>
-              </div>
-              <div>
-                <FieldLabel>Additional Details (GPA, honors, etc.)</FieldLabel>
-                <Input value={edu.details} onChange={v => updateEdu(i, "details", v)} placeholder="GPA: 3.8, Magna Cum Laude" />
-              </div>
-            </div>
-          ))}
-          <button
-            onClick={addEducation}
-            className="w-full py-2.5 border border-dashed border-border rounded-xl text-sm text-muted-foreground hover:text-primary hover:border-primary/50 flex items-center justify-center gap-2 transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Add Education
-          </button>
-
-          {data.certifications.length > 0 && (
-            <>
-              <SectionHeader title="Certifications" />
-              {data.certifications.map((cert, i) => (
-                <div key={i} className="flex gap-2 items-center mb-2 group">
-                  <Input
-                    value={cert}
-                    onChange={v =>
-                      update(d => {
-                        const certs = [...d.certifications];
-                        certs[i] = v;
-                        return { ...d, certifications: certs };
-                      })
-                    }
-                    placeholder="AWS Solutions Architect"
-                  />
-                  <button
-                    onClick={() =>
-                      update(d => ({
-                        ...d,
-                        certifications: d.certifications.filter((_, idx) => idx !== i),
-                      }))
-                    }
-                    className="p-1 text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                </span>
               ))}
-            </>
-          )}
+            </div>
+            <input
+              value={skillInput}
+              onChange={e => setSkillInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }}
+              placeholder="Type a skill and press Enter…"
+              style={inputStyle}
+              onFocus={e => { e.currentTarget.style.borderColor = "#f0a020"; }}
+              onBlur={e => { e.currentTarget.style.borderColor = "#1e304a"; }}
+            />
+          </SectionCard>
 
-          {data.customSections.length > 0 && (
-            <>
-              <SectionHeader title="Other Sections" />
-              <p className="text-xs text-muted-foreground mb-2">
-                These sections are preserved from your resume. Switch to LaTeX mode to edit them.
-              </p>
-              {data.customSections.map((cs, i) => (
-                <div key={i} className="bg-surface/20 border border-border/50 rounded-lg px-4 py-3 mb-2">
-                  <span className="text-sm font-medium text-foreground/80">{cs.title}</span>
-                </div>
-              ))}
-            </>
-          )}
+          {/* Certifications */}
+          <SectionCard title="Certifications">
+            {data.certifications.map((cert, i) => (
+              <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
+                <EditorInput value={cert} onChange={v => setData(d => ({ ...d, certifications: d.certifications.map((c, ci) => ci === i ? v : c) }))} placeholder="AWS Solutions Architect" />
+                <button onClick={() => removeCert(i)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "#3a5070", flexShrink: 0, padding: 0, transition: "color 0.15s" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#3a5070"; }}>
+                  <Trash2 style={{ width: 14, height: 14 }} />
+                </button>
+              </div>
+            ))}
+            <input
+              value={certInput}
+              onChange={e => setCertInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCert(); } }}
+              placeholder="Add certification and press Enter…"
+              style={inputStyle}
+              onFocus={e => { e.currentTarget.style.borderColor = "#f0a020"; }}
+              onBlur={e => { e.currentTarget.style.borderColor = "#1e304a"; }}
+            />
+          </SectionCard>
 
-          <div className="h-4" />
+          <div style={{ height: "80px" }} />
         </div>
       )}
 
-      <div className="flex-shrink-0 px-5 py-3 border-t border-border bg-surface/50 space-y-2">
-        {applyStatus === "error" && applyError && (
-          <p className="text-xs text-destructive bg-destructive/10 border border-destructive/25 rounded-lg px-3 py-2">
-            {applyError}
+      {/* ── Sticky footer ── */}
+      <div style={{ flexShrink: 0, padding: "12px 20px", borderTop: "1px solid #1e304a", background: "#0c1626", display: "flex", flexDirection: "column", gap: "8px" }}>
+        {updateStatus === "error" && updateError && (
+          <p style={{ fontSize: "12px", color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px", padding: "8px 12px", margin: 0 }}>
+            {updateError}
           </p>
         )}
-        <div className="flex justify-end">
-          <button
-            onClick={handleSave}
-            disabled={applyStatus === "applying"}
-            className={[
-              "px-5 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all shadow-md",
-              applyStatus === "success"
-                ? "bg-success text-white"
-                : applyStatus === "error"
-                  ? "bg-destructive/90 text-white hover:bg-destructive"
-                  : "bg-primary text-primary-foreground hover:bg-primary/90",
-              applyStatus === "applying" ? "opacity-70 cursor-not-allowed" : "",
-            ].join(" ")}
-          >
-            {applyStatus === "applying" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {applyStatus === "success" && <Check className="w-3.5 h-3.5" />}
-            {applyStatus === "applying" && "Applying…"}
-            {applyStatus === "success" && "✓ Applied!"}
-            {applyStatus === "error" && "Retry"}
-            {applyStatus === "idle" && "Apply Changes"}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <button onClick={handleReset}
+            style={{ fontSize: "12px", color: "#4a6080", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px", transition: "color 0.15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e2ddd4"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#4a6080"; }}>
+            <RefreshCw style={{ width: 12, height: 12 }} /> Reset to original
+          </button>
+          <button onClick={handleUpdate} disabled={updateStatus === "updating"}
+            style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+              border: "none", cursor: updateStatus === "updating" ? "not-allowed" : "pointer",
+              fontFamily: "inherit", transition: "opacity 0.2s",
+              background: updateStatus === "success" ? "#22c55e" : updateStatus === "error" ? "#ef4444" : "#f0a020",
+              color: "#070c18",
+              opacity: updateStatus === "updating" ? 0.7 : 1,
+            }}>
+            {updateStatus === "updating" && <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" />}
+            {updateStatus === "success" && <Check style={{ width: 14, height: 14 }} />}
+            {updateStatus === "updating" ? "Updating…"
+              : updateStatus === "success" ? "✓ Resume updated!"
+              : updateStatus === "error" ? "Retry"
+              : "✨ Update Preview →"}
           </button>
         </div>
       </div>
