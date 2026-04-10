@@ -807,22 +807,28 @@ Use exactly this structure (empty string if a field is not found):
 
 // ── Regenerate LaTeX from VisualResumeData via Claude ────────────────────────
 router.post("/regenerate-from-data", async (req: Request, res: Response) => {
+  console.log("regenerate-from-data called");
   const { resumeData, jd, originalLatex } = req.body as {
     resumeData?: Record<string, unknown>;
     jd?: { title?: string; company?: string; text?: string };
     originalLatex?: string;
   };
+  console.log("resumeData keys:", resumeData ? Object.keys(resumeData) : "missing");
+
   if (!resumeData) { res.status(400).json({ error: "resumeData is required" }); return; }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.error("regenerate-from-data: ANTHROPIC_API_KEY is not set");
+    res.status(500).json({ error: "API key not configured", details: "ANTHROPIC_API_KEY missing" });
+    return;
+  }
 
   // Extract preamble from original LaTeX so we preserve the template
   const preambleEnd = originalLatex ? originalLatex.indexOf("\\begin{document}") : -1;
   const preamble = preambleEnd > 0 ? originalLatex!.slice(0, preambleEnd + 16) : "";
 
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system: `You are a professional LaTeX resume generator. Generate a clean, ATS-optimised LaTeX resume from the structured JSON provided.
+  const systemPrompt = `You are a professional LaTeX resume generator. Generate a clean, ATS-optimised LaTeX resume from the structured JSON provided.
 ${preamble ? "You MUST use the exact same LaTeX preamble (\\documentclass, \\usepackage lines, etc.) as provided — do not change it." : "Use: \\documentclass[11pt]{article}, helvet font, geometry 0.65in margins, enumitem, hyperref."}
 Rules:
 - Return ONLY the complete LaTeX source code — no markdown, no code fences, no explanation
@@ -830,31 +836,61 @@ Rules:
 - Escape special characters: & → \\&, % → \\%, # → \\#, _ → \\_, $ → \\$
 - Use \\begin{itemize}[nosep, leftmargin=*] for bullet points
 - Keep formatting professional and consistent
-${jd ? `- This resume targets: ${jd.title || "the role"} at ${jd.company || "the company"}` : ""}`,
-      messages: [{
-        role: "user",
-        content: [
-          preamble ? `LaTeX preamble to reuse:\n${preamble}\n\n` : "",
-          `Resume data (JSON):\n${JSON.stringify(resumeData, null, 2)}`,
-          jd?.text ? `\n\nTarget job description (first 1000 chars):\n${jd.text.slice(0, 1000)}` : "",
-        ].join(""),
-      }],
+${jd ? `- This resume targets: ${jd.title || "the role"} at ${jd.company || "the company"}` : ""}`;
+
+  const userContent = [
+    preamble ? `LaTeX preamble to reuse:\n${preamble}\n\n` : "",
+    `Resume data (JSON):\n${JSON.stringify(resumeData, null, 2)}`,
+    jd?.text ? `\n\nTarget job description (first 1000 chars):\n${jd.text.slice(0, 1000)}` : "",
+  ].join("");
+
+  try {
+    console.log("regenerate-from-data: calling Anthropic API...");
+    const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }],
+      }),
     });
 
-    const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+    console.log("regenerate-from-data: API status:", apiRes.status);
+
+    if (!apiRes.ok) {
+      const errBody = await apiRes.text();
+      console.error("regenerate-from-data: API error body:", errBody);
+      res.status(500).json({ error: "Claude API error", details: errBody });
+      return;
+    }
+
+    const apiJson = await apiRes.json() as { content?: Array<{ type: string; text?: string }> };
+    const raw = apiJson.content?.[0]?.type === "text" ? (apiJson.content[0].text ?? "").trim() : "";
+    console.log("regenerate-from-data: raw length:", raw.length, "preview:", raw.substring(0, 80));
+
     const latex = raw
       .replace(/^```latex\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "")
       .trim();
 
+    console.log("regenerate-from-data: latex length:", latex.length);
+
     if (!latex.includes("\\documentclass")) {
+      console.error("regenerate-from-data: output missing \\documentclass");
       res.status(500).json({ error: "Generated output is not valid LaTeX. Please try again." });
       return;
     }
 
+    console.log("regenerate-from-data: success");
     res.json({ latex });
   } catch (err) {
     console.error("regenerate-from-data error:", err);
-    res.status(500).json({ error: "Failed to regenerate resume. Please try again." });
+    res.status(500).json({ error: "Failed to regenerate resume. Please try again.", details: err instanceof Error ? err.message : String(err) });
   }
 });
 

@@ -1497,7 +1497,7 @@ export default function Home() {
                                   <p className="text-sm text-white/50">Compiling preview…</p>
                                 </div>
                               ) : previewBlobs[activeJdTab] ? (
-                                <PdfPreview blob={previewBlobs[activeJdTab]} />
+                                <PdfPreview key={previewBlobs[activeJdTab].size + "-" + activeJdTab} blob={previewBlobs[activeJdTab]} />
                               ) : (
                                 <div className="h-full flex flex-col items-center justify-center gap-3 bg-[var(--rz-surface)]/30">
                                   <FileCode2 className="w-10 h-10 text-[var(--rz-muted)]/40" />
@@ -1509,15 +1509,19 @@ export default function Home() {
                                 latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
                                 jd={jds[activeJdTab]}
                                 onSave={async (updatedLatex: string) => {
+                                  console.log("5. onSave triggered, latex length:", updatedLatex?.length);
                                   setEditableLatex(prev => ({ ...prev, [activeJdTab]: updatedLatex }));
                                   setPreviewLoading(prev => ({ ...prev, [activeJdTab]: true }));
+                                  console.log("5a. Compiling LaTeX to PDF...");
                                   const blob = await compileLatexToBlob(updatedLatex);
                                   setPreviewLoading(prev => ({ ...prev, [activeJdTab]: false }));
+                                  console.log("6. Compile result — blob:", blob ? `${blob.size} bytes` : "null");
                                   if (!blob) {
                                     return { success: false, error: "Could not compile the resume. Please try again." };
                                   }
                                   setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
                                   setResumeViewMode("preview");
+                                  console.log("6. PDF blob updated, switched to preview tab");
                                   return { success: true };
                                 }}
                               />
@@ -1658,7 +1662,7 @@ export default function Home() {
                               {previewLoading[activeJdTab] && <div className="flex items-center gap-1.5 text-xs text-primary"><Loader2 className="w-3 h-3 animate-spin" /> Updating...</div>}
                             </div>
                             <div className="flex-1 overflow-hidden">
-                              {previewBlobs[activeJdTab] ? <PdfPreview blob={previewBlobs[activeJdTab]} /> : (
+                              {previewBlobs[activeJdTab] ? <PdfPreview key={previewBlobs[activeJdTab].size + "-agent-" + activeJdTab} blob={previewBlobs[activeJdTab]} /> : (
                                 <div className="h-full flex flex-col items-center justify-center gap-3 bg-[var(--rz-surface)]/40">
                                   <FileCode2 className="w-10 h-10 text-[var(--rz-muted)]/30" />
                                   <p className="text-sm text-[var(--rz-muted)]/60">Preview loading...</p>
