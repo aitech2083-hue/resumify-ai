@@ -1,16 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: 'DM Sans', sans-serif;
-  --font-display: 'Outfit', sans-serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Inter', sans-serif;
+  --font-wordmark: 'Playfair Display', serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-surface: hsl(var(--surface));
   --color-surface-hover: hsl(var(--surface-hover));
-  
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -33,7 +34,7 @@
 
   --color-success: hsl(var(--success));
   --color-success-foreground: hsl(var(--success-foreground));
-  
+
   --color-warning: hsl(var(--warning));
   --color-warning-foreground: hsl(var(--warning-foreground));
 
@@ -45,29 +46,29 @@
 }
 
 :root {
-  /* Deep Navy & Gold Premium Theme */
-  --background: 224 40% 5%;
-  --surface: 222 35% 8%;
-  --surface-hover: 220 30% 12%;
+  /* Pure Black Premium Dark Theme */
+  --background: 0 0% 4%;
+  --surface: 0 0% 8%;
+  --surface-hover: 0 0% 10%;
 
-  --foreground: 40 20% 95%;
-  --muted: 220 20% 15%;
-  --muted-foreground: 220 15% 65%;
+  --foreground: 0 0% 100%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 53%;
 
-  --border: 220 30% 14%;
-  --input: 220 30% 12%;
-  --ring: 37 90% 55%;
+  --border: 0 0% 15%;
+  --input: 0 0% 8%;
+  --ring: 221 83% 53%;
 
-  /* Gold Accent */
-  --primary: 37 90% 55%;
-  --primary-hover: 37 90% 60%;
-  --primary-foreground: 224 40% 5%;
+  /* Royal Blue Accent */
+  --primary: 221 83% 53%;
+  --primary-hover: 221 70% 48%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 30% 15%;
-  --secondary-foreground: 40 20% 95%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 100%;
 
-  --accent: 220 30% 15%;
-  --accent-foreground: 37 90% 55%;
+  --accent: 0 0% 12%;
+  --accent-foreground: 221 83% 53%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
@@ -79,19 +80,19 @@
   --warning-foreground: 48 96% 10%;
 
   /* ── RezAI theme tokens (dark default) ── */
-  --rz-bg: #070c18;
-  --rz-surface: #0c1626;
-  --rz-border: #1e304a;
-  --rz-border-input: #1b2d45;
-  --rz-text: #e2ddd4;
-  --rz-muted: #4a6080;
-  --rz-hint: #2e4060;
-  --rz-accent: #f0a020;
-  --rz-accent-hover: #c77a10;
-  --rz-accent-text: #070c18;
+  --rz-bg: #0a0a0a;
+  --rz-surface: #141414;
+  --rz-border: #262626;
+  --rz-border-input: #262626;
+  --rz-text: #ffffff;
+  --rz-muted: #888888;
+  --rz-hint: #444444;
+  --rz-accent: #2563eb;
+  --rz-accent-hover: #1d4ed8;
+  --rz-accent-text: #ffffff;
   --rz-card-bg: rgba(255,255,255,0.02);
   --rz-card-border: rgba(255,255,255,0.06);
-  --rz-card-hover-border: rgba(240,160,32,0.25);
+  --rz-card-hover-border: rgba(37,99,235,0.25);
   --rz-pdf-bg: #525659;
 }
 
@@ -105,14 +106,14 @@
   --muted-foreground: 25 5% 64%;
   --border: 40 6% 90%;
   --input: 0 0% 100%;
-  --ring: 220 63% 33%;
-  --primary: 220 63% 33%;
-  --primary-hover: 220 65% 40%;
+  --ring: 221 83% 53%;
+  --primary: 221 83% 53%;
+  --primary-hover: 221 70% 48%;
   --primary-foreground: 0 0% 100%;
   --secondary: 40 6% 95%;
   --secondary-foreground: 20 10% 11%;
-  --accent: 40 6% 91%;
-  --accent-foreground: 220 63% 33%;
+  --accent: 219 100% 95%;
+  --accent-foreground: 221 83% 53%;
   --destructive: 0 84% 35%;
   --success: 142 71% 28%;
 
@@ -123,12 +124,12 @@
   --rz-text: #1c1917;
   --rz-muted: #a8a29e;
   --rz-hint: #d6d3d1;
-  --rz-accent: #1e3a8a;
-  --rz-accent-hover: #1e40af;
+  --rz-accent: #2563eb;
+  --rz-accent-hover: #1d4ed8;
   --rz-accent-text: #ffffff;
   --rz-card-bg: #ffffff;
   --rz-card-border: #e7e5e4;
-  --rz-card-hover-border: rgba(30,58,138,0.25);
+  --rz-card-hover-border: rgba(37,99,235,0.25);
   --rz-pdf-bg: #e8e6e3;
 }
 
@@ -144,38 +145,44 @@
 }
 
 @layer utilities {
+  .font-wordmark {
+    font-family: var(--font-wordmark);
+  }
+
   .glass-panel {
     @apply bg-surface/80 backdrop-blur-xl border border-border;
   }
-  
+
   .glass-panel-heavy {
     @apply bg-background/90 backdrop-blur-2xl border border-border;
   }
 
   .text-gradient-gold {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#F7C353] via-[#D49E37] to-[#B37D22];
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, #3b82f6, #2563eb, #1d4ed8);
   }
   :root.light .text-gradient-gold {
-    background-image: linear-gradient(to right, #1e3a8a, #1e40af, #1d4ed8);
+    background-image: linear-gradient(to right, #2563eb, #1d4ed8, #1e40af);
   }
-  
+
   .shadow-glow {
     box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.3);
   }
-  
-  /* Custom scrollbar for dark theme */
+
+  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    background: #0a0a0a;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted rounded-full;
+    background: #333333;
+    border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/50;
+    background: #444444;
   }
 }
 

@@ -61,12 +61,12 @@ const EMPTY_DATA: VisualResumeData = {
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#070c18",
-  border: "1px solid #1e304a",
+  background: "#0a0a0a",
+  border: "1px solid #262626",
   borderRadius: "8px",
   padding: "10px 14px",
   fontSize: "13px",
-  color: "#e2ddd4",
+  color: "#ffffff",
   outline: "none",
   transition: "border-color 0.15s",
   boxSizing: "border-box",
@@ -75,10 +75,10 @@ const inputStyle: React.CSSProperties = {
 
 const focusHandlers = {
   onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    e.currentTarget.style.borderColor = "#f0a020";
+    e.currentTarget.style.borderColor = "#2563eb";
   },
   onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    e.currentTarget.style.borderColor = "#1e304a";
+    e.currentTarget.style.borderColor = "#262626";
   },
 };
 
@@ -90,9 +90,9 @@ function SectionCard({ title, action, children }: {
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ background: "#0c1626", border: "1px solid #1e304a", borderRadius: "12px", padding: "20px", marginBottom: "16px" }}>
+    <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: "12px", padding: "20px", marginBottom: "16px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#3a5070" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: "#666666" }}>
           {title}
         </span>
         {action}
@@ -104,7 +104,7 @@ function SectionCard({ title, action, children }: {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#4a6080", marginBottom: "5px" }}>
+    <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#888888", marginBottom: "5px" }}>
       {children}
     </label>
   );
@@ -131,7 +131,7 @@ function EditorTextarea({ value, onChange, placeholder, rows = 2 }: {
 
 function AddBtn({ onClick, label }: { onClick: () => void; label: string }) {
   return (
-    <button onClick={onClick} style={{ background: "none", border: "none", color: "#f0a020", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: "2px 0", fontFamily: "inherit" }}>
+    <button onClick={onClick} style={{ background: "none", border: "none", color: "#2563eb", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: "2px 0", fontFamily: "inherit" }}>
       <Plus style={{ width: 13, height: 13 }} /> {label}
     </button>
   );
@@ -141,7 +141,7 @@ function RemoveBtn({ onClick }: { onClick: () => void }) {
   const [hover, setHover] = useState(false);
   return (
     <button onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ background: "none", border: "none", cursor: "pointer", color: hover ? "#ef4444" : "#3a5070", padding: 0, display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", fontFamily: "inherit", transition: "color 0.15s", flexShrink: 0 }}>
+      style={{ background: "none", border: "none", cursor: "pointer", color: hover ? "#ef4444" : "#666666", padding: 0, display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", fontFamily: "inherit", transition: "color 0.15s", flexShrink: 0 }}>
       <Trash2 style={{ width: 12, height: 12 }} /> Remove
     </button>
   );
@@ -150,7 +150,7 @@ function RemoveBtn({ onClick }: { onClick: () => void }) {
 function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
     <button onClick={onClick}
-      style={{ display: "flex", alignItems: "center", gap: "5px", padding: "5px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", background: active ? "#1e304a" : "transparent", color: active ? "#e2ddd4" : "#4a6080" }}>
+      style={{ display: "flex", alignItems: "center", gap: "5px", padding: "5px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", background: active ? "#262626" : "transparent", color: active ? "#ffffff" : "#888888" }}>
       {icon} {label}
     </button>
   );
@@ -331,18 +331,18 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#070c18" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#0a0a0a" }}>
 
       {/* ── Tab bar ── */}
-      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "8px 16px", borderBottom: "1px solid #1e304a", background: "#0c1626", gap: "4px" }}>
-        <div style={{ display: "flex", gap: "2px", background: "#070c18", borderRadius: "8px", padding: "3px" }}>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", padding: "8px 16px", borderBottom: "1px solid #262626", background: "#141414", gap: "4px" }}>
+        <div style={{ display: "flex", gap: "2px", background: "#0a0a0a", borderRadius: "8px", padding: "3px" }}>
           <TabButton active={mode === "visual"} onClick={() => setMode("visual")}
             icon={<Pencil style={{ width: 13, height: 13 }} />} label="Edit Resume" />
           <TabButton active={mode === "latex"} onClick={() => { setRawLatex(latex); setMode("latex"); }}
             icon={<Code2 style={{ width: 13, height: 13 }} />} label="LaTeX (Advanced)" />
         </div>
         {mode === "visual" && parseStatus === "error" && (
-          <button onClick={() => { parsedForLatex.current = ""; doParseLatex(); }} style={{ marginLeft: "auto", fontSize: "11px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px" }}>
+          <button onClick={() => { parsedForLatex.current = ""; doParseLatex(); }} style={{ marginLeft: "auto", fontSize: "11px", color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px" }}>
             <RefreshCw style={{ width: 12, height: 12 }} /> Retry
           </button>
         )}
@@ -351,13 +351,13 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
       {/* ── LaTeX mode ── */}
       {mode === "latex" ? (
         <textarea value={rawLatex} onChange={e => setRawLatex(e.target.value)}
-          style={{ flex: 1, width: "100%", background: "#0d1117", color: "#c9d1d9", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6, padding: "20px", resize: "none", outline: "none", border: "none" }}
+          style={{ flex: 1, width: "100%", background: "#0a0a0a", color: "#e0e0e0", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.6, padding: "20px", resize: "none", outline: "none", border: "none" }}
           spellCheck={false} placeholder="% LaTeX resume source"
           className="custom-scrollbar" />
 
       /* ── Loading ── */
       ) : parseStatus === "loading" ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px", color: "#4a6080" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px", color: "#888888" }}>
           <Loader2 style={{ width: 28, height: 28 }} className="animate-spin" />
           <p style={{ fontSize: "13px", margin: 0 }}>Loading editor…</p>
         </div>
@@ -368,19 +368,19 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
 
           {/* No-latex banner */}
           {!latex?.trim() && (
-            <div style={{ background: "#1a1f2e", border: "1px solid #f0a020", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ background: "#141414", border: "1px solid #2563eb", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "16px" }}>⚠️</span>
-              <p style={{ margin: 0, fontSize: "13px", color: "#f0a020" }}>No resume found. Please generate a resume first.</p>
+              <p style={{ margin: 0, fontSize: "13px", color: "#2563eb" }}>No resume found. Please generate a resume first.</p>
             </div>
           )}
 
           {/* Parse-failed fallback notice */}
           {parseStatus === "error" && latex?.trim() && (
-            <div style={{ background: "#1a1f2e", border: "1px solid #3a5070", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "10px" }}>
+            <div style={{ background: "#141414", border: "1px solid #666666", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "10px" }}>
               <span style={{ fontSize: "16px", flexShrink: 0 }}>ℹ️</span>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#e2ddd4" }}>Could not auto-parse resume. You can fill in the fields manually below.</p>
-                <button onClick={() => { parsedForLatex.current = ""; doParseLatex(); }} style={{ fontSize: "12px", color: "#f0a020", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, display: "flex", alignItems: "center", gap: "4px" }}>
+                <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#ffffff" }}>Could not auto-parse resume. You can fill in the fields manually below.</p>
+                <button onClick={() => { parsedForLatex.current = ""; doParseLatex(); }} style={{ fontSize: "12px", color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0, display: "flex", alignItems: "center", gap: "4px" }}>
                   <RefreshCw style={{ width: 12, height: 12 }} /> Try parsing again
                 </button>
               </div>
@@ -421,10 +421,10 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           {/* Experience */}
           <SectionCard title="Work Experience" action={<AddBtn onClick={addExperience} label="+ Add" />}>
             {data.experience.length === 0 && (
-              <p style={{ fontSize: "12px", color: "#4a6080", textAlign: "center", padding: "16px 0", margin: 0 }}>No experience entries. Click "+ Add" to add one.</p>
+              <p style={{ fontSize: "12px", color: "#888888", textAlign: "center", padding: "16px 0", margin: 0 }}>No experience entries. Click "+ Add" to add one.</p>
             )}
             {data.experience.map(exp => (
-              <div key={exp.id} style={{ background: "#070c18", border: "1px solid #1e304a", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
+              <div key={exp.id} style={{ background: "#0a0a0a", border: "1px solid #262626", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                   <div>
                     <FieldLabel>Job Title</FieldLabel>
@@ -452,12 +452,12 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
                 <FieldLabel>Bullet points</FieldLabel>
                 {exp.bullets.map((b, bi) => (
                   <div key={bi} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "6px" }}>
-                    <span style={{ color: "#4a6080", marginTop: "13px", fontSize: "13px", flexShrink: 0 }}>•</span>
+                    <span style={{ color: "#888888", marginTop: "13px", fontSize: "13px", flexShrink: 0 }}>•</span>
                     <EditorTextarea value={b} onChange={v => updExpBullet(exp.id, bi, v)} placeholder="Accomplished [X] by [Y], resulting in [Z]" rows={2} />
                     <button onClick={() => removeExpBullet(exp.id, bi)}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#3a5070", padding: "12px 0 0 0", flexShrink: 0, transition: "color 0.15s" }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#666666", padding: "12px 0 0 0", flexShrink: 0, transition: "color 0.15s" }}
                       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#3a5070"; }}>
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#666666"; }}>
                       <Trash2 style={{ width: 13, height: 13 }} />
                     </button>
                   </div>
@@ -473,10 +473,10 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           {/* Education */}
           <SectionCard title="Education" action={<AddBtn onClick={addEducation} label="+ Add" />}>
             {data.education.length === 0 && (
-              <p style={{ fontSize: "12px", color: "#4a6080", textAlign: "center", padding: "16px 0", margin: 0 }}>No education entries. Click "+ Add" to add one.</p>
+              <p style={{ fontSize: "12px", color: "#888888", textAlign: "center", padding: "16px 0", margin: 0 }}>No education entries. Click "+ Add" to add one.</p>
             )}
             {data.education.map(edu => (
-              <div key={edu.id} style={{ background: "#070c18", border: "1px solid #1e304a", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
+              <div key={edu.id} style={{ background: "#0a0a0a", border: "1px solid #262626", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                   <div>
                     <FieldLabel>Degree</FieldLabel>
@@ -502,12 +502,12 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           <SectionCard title="Skills">
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
               {data.skills.map(skill => (
-                <span key={skill} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#1e304a", border: "1px solid #2e4060", borderRadius: "20px", padding: "4px 10px 4px 12px", fontSize: "12px", color: "#e2ddd4" }}>
+                <span key={skill} style={{ display: "inline-flex", alignItems: "center", gap: "5px", background: "#262626", border: "1px solid #444444", borderRadius: "20px", padding: "4px 10px 4px 12px", fontSize: "12px", color: "#ffffff" }}>
                   {skill}
                   <button onClick={() => removeSkill(skill)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#4a6080", padding: 0, lineHeight: 1, display: "flex", alignItems: "center", transition: "color 0.15s" }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#888888", padding: 0, lineHeight: 1, display: "flex", alignItems: "center", transition: "color 0.15s" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#4a6080"; }}>
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#888888"; }}>
                     <X style={{ width: 11, height: 11 }} />
                   </button>
                 </span>
@@ -519,8 +519,8 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
               onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }}
               placeholder="Type a skill and press Enter…"
               style={inputStyle}
-              onFocus={e => { e.currentTarget.style.borderColor = "#f0a020"; }}
-              onBlur={e => { e.currentTarget.style.borderColor = "#1e304a"; }}
+              onFocus={e => { e.currentTarget.style.borderColor = "#2563eb"; }}
+              onBlur={e => { e.currentTarget.style.borderColor = "#262626"; }}
             />
           </SectionCard>
 
@@ -530,9 +530,9 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
               <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
                 <EditorInput value={cert} onChange={v => setData(d => ({ ...d, certifications: d.certifications.map((c, ci) => ci === i ? v : c) }))} placeholder="AWS Solutions Architect" />
                 <button onClick={() => removeCert(i)}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "#3a5070", flexShrink: 0, padding: 0, transition: "color 0.15s" }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "#666666", flexShrink: 0, padding: 0, transition: "color 0.15s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#3a5070"; }}>
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#666666"; }}>
                   <Trash2 style={{ width: 14, height: 14 }} />
                 </button>
               </div>
@@ -543,8 +543,8 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
               onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCert(); } }}
               placeholder="Add certification and press Enter…"
               style={inputStyle}
-              onFocus={e => { e.currentTarget.style.borderColor = "#f0a020"; }}
-              onBlur={e => { e.currentTarget.style.borderColor = "#1e304a"; }}
+              onFocus={e => { e.currentTarget.style.borderColor = "#2563eb"; }}
+              onBlur={e => { e.currentTarget.style.borderColor = "#262626"; }}
             />
           </SectionCard>
 
@@ -553,7 +553,7 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
       )}
 
       {/* ── Sticky footer ── */}
-      <div style={{ flexShrink: 0, padding: "12px 20px", borderTop: "1px solid #1e304a", background: "#0c1626", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ flexShrink: 0, padding: "12px 20px", borderTop: "1px solid #262626", background: "#141414", display: "flex", flexDirection: "column", gap: "8px" }}>
         {updateStatus === "error" && updateError && (
           <p style={{ fontSize: "12px", color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px", padding: "8px 12px", margin: 0 }}>
             {updateError}
@@ -561,9 +561,9 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
         )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <button onClick={handleReset}
-            style={{ fontSize: "12px", color: "#4a6080", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px", transition: "color 0.15s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#e2ddd4"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#4a6080"; }}>
+            style={{ fontSize: "12px", color: "#888888", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px", transition: "color 0.15s" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ffffff"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "#888888"; }}>
             <RefreshCw style={{ width: 12, height: 12 }} /> Reset to original
           </button>
           <button onClick={handleUpdate} disabled={updateStatus === "updating"}
@@ -572,8 +572,8 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
               padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
               border: "none", cursor: updateStatus === "updating" ? "not-allowed" : "pointer",
               fontFamily: "inherit", transition: "opacity 0.2s",
-              background: updateStatus === "success" ? "#22c55e" : updateStatus === "error" ? "#ef4444" : "#f0a020",
-              color: "#070c18",
+              background: updateStatus === "success" ? "#22c55e" : updateStatus === "error" ? "#ef4444" : "#2563eb",
+              color: "#ffffff",
               opacity: updateStatus === "updating" ? 0.7 : 1,
             }}>
             {updateStatus === "updating" && <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" />}
