@@ -724,6 +724,140 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
   }
 });
 
+// ── Parse LaTeX → structured VisualResumeData via Claude ─────────────────────
+router.post("/parse-latex", async (req: Request, res: Response) => {
+  console.log("parse-latex called");
+  const { latex } = req.body as { latex?: string };
+  console.log("Latex length:", latex?.length ?? 0);
+  console.log("Latex preview:", latex?.substring(0, 200));
+
+  if (!latex) { res.status(400).json({ error: "latex is required" }); return; }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.error("parse-latex: ANTHROPIC_API_KEY is not set");
+    res.status(500).json({ error: "API key not configured", details: "ANTHROPIC_API_KEY missing" });
+    return;
+  }
+
+  try {
+    console.log("parse-latex: calling Anthropic API...");
+    const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 2048,
+        system: `You are a LaTeX resume parser. Parse the LaTeX resume into structured JSON.
+Return ONLY valid JSON — no markdown, no code fences, no explanation.
+Use exactly this structure (empty string if a field is not found):
+{
+  "personalInfo": { "name": "", "email": "", "phone": "", "location": "", "linkedin": "" },
+  "summary": "",
+  "experience": [{ "id": "1", "title": "", "company": "", "location": "", "startDate": "", "endDate": "", "bullets": [""] }],
+  "education": [{ "id": "1", "degree": "", "institution": "", "year": "" }],
+  "skills": [],
+  "certifications": []
+}`,
+        messages: [{ role: "user", content: latex }],
+      }),
+    });
+
+    console.log("parse-latex: API status:", apiRes.status);
+
+    if (!apiRes.ok) {
+      const errBody = await apiRes.text();
+      console.error("parse-latex: API error body:", errBody);
+      res.status(500).json({ error: "Claude API error", details: errBody });
+      return;
+    }
+
+    const apiJson = await apiRes.json() as { content?: Array<{ type: string; text?: string }>; error?: { message: string } };
+    console.log("parse-latex: API response type:", apiJson?.content?.[0]?.type);
+
+    const raw = apiJson.content?.[0]?.type === "text" ? (apiJson.content[0].text ?? "{}").trim() : "{}";
+    // Strip markdown code fences if present
+    const cleaned = raw
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    console.log("parse-latex: cleaned JSON preview:", cleaned.substring(0, 100));
+
+    let data: unknown;
+    try {
+      data = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("parse-latex: JSON.parse failed:", parseErr, "raw:", cleaned.substring(0, 300));
+      res.status(500).json({ error: "Failed to parse Claude response as JSON", details: String(parseErr) });
+      return;
+    }
+
+    console.log("parse-latex: success");
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error("parse-latex error:", err);
+    res.status(500).json({ error: "Failed to parse resume. Please try again.", details: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// ── Regenerate LaTeX from VisualResumeData via Claude ────────────────────────
+router.post("/regenerate-from-data", async (req: Request, res: Response) => {
+  const { resumeData, jd, originalLatex } = req.body as {
+    resumeData?: Record<string, unknown>;
+    jd?: { title?: string; company?: string; text?: string };
+    originalLatex?: string;
+  };
+  if (!resumeData) { res.status(400).json({ error: "resumeData is required" }); return; }
+
+  // Extract preamble from original LaTeX so we preserve the template
+  const preambleEnd = originalLatex ? originalLatex.indexOf("\\begin{document}") : -1;
+  const preamble = preambleEnd > 0 ? originalLatex!.slice(0, preambleEnd + 16) : "";
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4096,
+      system: `You are a professional LaTeX resume generator. Generate a clean, ATS-optimised LaTeX resume from the structured JSON provided.
+${preamble ? "You MUST use the exact same LaTeX preamble (\\documentclass, \\usepackage lines, etc.) as provided — do not change it." : "Use: \\documentclass[11pt]{article}, helvet font, geometry 0.65in margins, enumitem, hyperref."}
+Rules:
+- Return ONLY the complete LaTeX source code — no markdown, no code fences, no explanation
+- Start with \\documentclass, end with \\end{document}
+- Escape special characters: & → \\&, % → \\%, # → \\#, _ → \\_, $ → \\$
+- Use \\begin{itemize}[nosep, leftmargin=*] for bullet points
+- Keep formatting professional and consistent
+${jd ? `- This resume targets: ${jd.title || "the role"} at ${jd.company || "the company"}` : ""}`,
+      messages: [{
+        role: "user",
+        content: [
+          preamble ? `LaTeX preamble to reuse:\n${preamble}\n\n` : "",
+          `Resume data (JSON):\n${JSON.stringify(resumeData, null, 2)}`,
+          jd?.text ? `\n\nTarget job description (first 1000 chars):\n${jd.text.slice(0, 1000)}` : "",
+        ].join(""),
+      }],
+    });
+
+    const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+    const latex = raw
+      .replace(/^```latex\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "")
+      .trim();
+
+    if (!latex.includes("\\documentclass")) {
+      res.status(500).json({ error: "Generated output is not valid LaTeX. Please try again." });
+      return;
+    }
+
+    res.json({ latex });
+  } catch (err) {
+    console.error("regenerate-from-data error:", err);
+    res.status(500).json({ error: "Failed to regenerate resume. Please try again." });
+  }
+});
+
 // ── RezAI Agent — unified career coach endpoint ──────────────────────────────
 router.post(
   "/agent",
