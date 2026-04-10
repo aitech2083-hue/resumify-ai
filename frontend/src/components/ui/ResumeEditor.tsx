@@ -48,6 +48,95 @@ export interface ResumeEditorProps {
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
 
+// ─── LaTeX builder (no Claude needed) ────────────────────────────────────────
+
+function escTex(s: string): string {
+  return (s ?? "")
+    .replace(/\\/g, "\\textbackslash{}")
+    .replace(/&/g, "\\&")
+    .replace(/%/g, "\\%")
+    .replace(/\$/g, "\\$")
+    .replace(/#/g, "\\#")
+    .replace(/_/g, "\\_")
+    .replace(/\^/g, "\\^{}")
+    .replace(/\{/g, "\\{")
+    .replace(/\}/g, "\\}")
+    .replace(/~/g, "\\textasciitilde{}")
+    .replace(/</g, "\\textless{}")
+    .replace(/>/g, "\\textgreater{}");
+}
+
+function buildLatexFromData(d: VisualResumeData): string {
+  const pi = d.personalInfo;
+
+  // Header contact line — only include non-empty fields
+  const contactParts = [pi.location, pi.email, pi.phone, pi.linkedin]
+    .filter(Boolean)
+    .map(escTex)
+    .join(" $\\bullet$ ");
+
+  const experienceSection = d.experience.length === 0 ? "" : `
+\\section*{Work Experience}
+\\vspace{-4pt}
+${d.experience.map(exp => {
+  const bullets = exp.bullets.filter(Boolean);
+  return `\\noindent\\textbf{${escTex(exp.title)}} \\hfill ${escTex(exp.startDate)}${exp.endDate ? ` -- ${escTex(exp.endDate)}` : ""}\\\\
+\\textit{${escTex(exp.company)}${exp.location ? `, ${escTex(exp.location)}` : ""}}
+${bullets.length > 0 ? `\\begin{itemize}[nosep,leftmargin=*,topsep=2pt,partopsep=0pt]
+${bullets.map(b => `  \\item ${escTex(b)}`).join("\n")}
+\\end{itemize}` : ""}`;
+}).join("\n\\vspace{6pt}\n")}`;
+
+  const educationSection = d.education.length === 0 ? "" : `
+\\section*{Education}
+\\vspace{-4pt}
+${d.education.map(edu => `\\noindent\\textbf{${escTex(edu.degree)}} \\hfill ${escTex(edu.year)}\\\\
+${escTex(edu.institution)}`).join("\n\\vspace{4pt}\n")}`;
+
+  const skillsSection = d.skills.filter(Boolean).length === 0 ? "" : `
+\\section*{Skills}
+${escTex(d.skills.filter(Boolean).join(", "))}`;
+
+  const certsSection = d.certifications.filter(Boolean).length === 0 ? "" : `
+\\section*{Certifications}
+\\begin{itemize}[nosep,leftmargin=*]
+${d.certifications.filter(Boolean).map(c => `  \\item ${escTex(c)}`).join("\n")}
+\\end{itemize}`;
+
+  const summarySection = d.summary.trim() ? `
+\\section*{Professional Summary}
+${escTex(d.summary)}` : "";
+
+  return `\\documentclass[11pt,a4paper]{article}
+\\usepackage[top=0.65in,bottom=0.65in,left=0.65in,right=0.65in]{geometry}
+\\usepackage[hidelinks]{hyperref}
+\\usepackage{enumitem}
+\\usepackage[T1]{fontenc}
+\\usepackage{helvet}
+\\renewcommand{\\familydefault}{\\sfdefault}
+\\pagestyle{empty}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{0pt}
+
+\\begin{document}
+
+\\begin{center}
+{\\Large \\textbf{${escTex(pi.name)}}}\\\\[4pt]
+{\\small ${contactParts}}
+\\end{center}
+
+\\vspace{2pt}
+\\hrule
+\\vspace{4pt}
+${summarySection}
+${experienceSection}
+${educationSection}
+${skillsSection}
+${certsSection}
+
+\\end{document}`.replace(/\n{3,}/g, "\n\n");
+}
+
 const EMPTY_DATA: VisualResumeData = {
   personalInfo: { name: "", email: "", phone: "", location: "", linkedin: "" },
   summary: "",
@@ -295,47 +384,19 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
     setUpdateError(null);
     try {
       if (mode === "latex") {
-        console.log("1. Update clicked — LaTeX mode, length:", rawLatex?.length);
         const result = await onSave(rawLatex);
         if (result.success) { setUpdateStatus("success"); setTimeout(() => setUpdateStatus("idle"), 2000); }
         else { setUpdateStatus("error"); setUpdateError(result.error || "Compilation failed."); }
         return;
       }
 
-      // Visual mode: ask Claude to regenerate full LaTeX from structured data
-      console.log("1. Update clicked — visual mode, resumeData:", JSON.stringify(data).substring(0, 200));
-      console.log("2. API call starting...", `${BASE_URL}api/resume/regenerate-from-data`);
-
-      const regenRes = await fetch(`${BASE_URL}api/resume/regenerate-from-data`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeData: data, jd, originalLatex: latex }),
-      });
-
-      console.log("3. API response received, status:", regenRes.status);
-
-      if (!regenRes.ok) {
-        const err = await regenRes.json().catch(() => null);
-        console.error("3a. API error:", err);
-        throw new Error(err?.error || `Regeneration failed (HTTP ${regenRes.status}).`);
-      }
-
-      const responseJson = await regenRes.json();
-      const newLatex: string = responseJson.latex;
-      console.log("4. New latex length:", newLatex?.length, "valid:", newLatex?.includes("\\documentclass"));
-
-      if (!newLatex) {
-        throw new Error("Backend returned empty LaTeX. Please try again.");
-      }
-
-      console.log("5. Triggering PDF recompile...");
-      const result = await onSave(newLatex);
-      console.log("6. onSave result:", result);
-
+      // Visual mode: build LaTeX directly in JS — no Claude API call needed
+      const builtLatex = buildLatexFromData(data);
+      console.log("Built LaTeX, length:", builtLatex.length);
+      const result = await onSave(builtLatex);
       if (result.success) { setUpdateStatus("success"); setTimeout(() => setUpdateStatus("idle"), 2500); }
-      else { setUpdateStatus("error"); setUpdateError(result.error || "Could not compile the generated resume."); }
+      else { setUpdateStatus("error"); setUpdateError(result.error || "Could not compile. Please check your content for special characters."); }
     } catch (e: unknown) {
-      console.error("handleUpdate error:", e);
       setUpdateStatus("error");
       setUpdateError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
