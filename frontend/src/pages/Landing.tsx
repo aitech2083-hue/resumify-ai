@@ -70,7 +70,7 @@ function Navbar() {
           <div className="w-8 h-8 rounded-lg bg-[var(--rz-accent)] flex items-center justify-center shadow-lg">
             <Sparkles className="w-4 h-4 text-[var(--rz-accent-text)]" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-[var(--rz-text)] font-display">
+          <span className="text-xl font-bold tracking-tight text-[var(--rz-text)] font-wordmark">
             Rez<span className="text-[var(--rz-accent)]">AI</span>
           </span>
         </Link>
@@ -506,7 +506,7 @@ function Footer() {
           <div className="w-7 h-7 rounded-lg bg-[var(--rz-accent)] flex items-center justify-center">
             <Sparkles className="w-3.5 h-3.5 text-[var(--rz-accent-text)]" />
           </div>
-          <span className="text-lg font-bold text-[var(--rz-text)] font-display">
+          <span className="text-lg font-bold text-[var(--rz-text)] font-wordmark">
             Rez<span className="text-[var(--rz-accent)]">AI</span>
           </span>
         </div>

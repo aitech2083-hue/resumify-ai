@@ -554,10 +554,10 @@ export default function Home() {
       <nav className="flex-shrink-0 h-12 px-5 flex items-center justify-between border-b border-[var(--rz-border)] bg-[var(--rz-surface)]/90 backdrop-blur-sm z-30">
         {/* Logo */}
         <a href="/app" className="flex items-center gap-2 group">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-[var(--rz-accent-hover)] flex items-center justify-center shadow-[0_0_12px_rgba(240,160,32,0.3)]">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-[var(--rz-accent-hover)] flex items-center justify-center shadow-[0_0_12px_rgba(37,99,235,0.3)]">
             <Zap className="w-4 h-4 text-[var(--rz-accent-text)] fill-current" />
           </div>
-          <span className="font-bold text-sm tracking-wide text-foreground">RezAI</span>
+          <span className="font-bold text-sm tracking-wide text-foreground font-wordmark">RezAI</span>
         </a>
 
         {/* Right links */}
@@ -660,8 +660,8 @@ export default function Home() {
                       animate={{ opacity: 1, y: 0 }}
                       className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-2xl overflow-hidden shadow-2xl"
                     >
-                      {/* Amber progress bar */}
-                      <div className="h-1 bg-[#1e304a] relative overflow-hidden">
+                      {/* Progress bar */}
+                      <div className="h-1 bg-[#262626] relative overflow-hidden">
                         <motion.div
                           className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)]"
                           animate={{ width: `${((generateStep + 1) / 4) * 100}%` }}
@@ -672,7 +672,7 @@ export default function Home() {
                         {/* Pulsing logo */}
                         <div className="flex justify-center mb-6">
                           <div className="relative">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-[var(--rz-accent-hover)] flex items-center justify-center shadow-[0_0_40px_rgba(240,160,32,0.4)]">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-[var(--rz-accent-hover)] flex items-center justify-center shadow-[0_0_40px_rgba(37,99,235,0.4)]">
                               <Zap className="w-8 h-8 text-[var(--rz-accent-text)] fill-current" />
                             </div>
                             <span className="absolute inset-0 rounded-2xl bg-primary/30 animate-ping" style={{ animationDuration: "1.8s" }} />
@@ -692,7 +692,7 @@ export default function Home() {
                               <div className={cn(
                                 "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500",
                                 i < generateStep ? "bg-success border border-success/30" :
-                                i === generateStep ? "bg-primary border border-primary/30 shadow-[0_0_8px_rgba(240,160,32,0.5)]" :
+                                i === generateStep ? "bg-primary border border-primary/30 shadow-[0_0_8px_rgba(37,99,235,0.5)]" :
                                 "bg-[var(--rz-surface)] border border-[var(--rz-border)]"
                               )}>
                                 {i < generateStep ? (
@@ -700,7 +700,7 @@ export default function Home() {
                                 ) : i === generateStep ? (
                                   <Loader2 className="w-3 h-3 text-[var(--rz-accent-text)] animate-spin" />
                                 ) : (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#1e304a]" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#262626]" />
                                 )}
                               </div>
                               <span className={cn("text-sm transition-colors", i <= generateStep ? "text-foreground" : "text-[var(--rz-muted)]")}>{step}</span>
@@ -817,12 +817,12 @@ export default function Home() {
                                       "rounded-xl p-3 text-left transition-all border",
                                       linkedinImportType === "url"
                                         ? "border-primary bg-primary/10"
-                                        : "border-[var(--rz-border)] bg-[var(--rz-bg)] hover:border-[#2a3f5a]"
+                                        : "border-[var(--rz-border)] bg-[var(--rz-bg)] hover:border-[#333333]"
                                     )}
                                   >
                                     <div className="text-sm mb-1">🔗 Paste URL</div>
                                     <div className={cn("text-[10px] font-bold rounded-full px-1.5 py-0.5 inline-block mb-1.5",
-                                      linkedinImportType === "url" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[var(--rz-muted)]"
+                                      linkedinImportType === "url" ? "bg-primary/20 text-primary" : "bg-[#262626] text-[var(--rz-muted)]"
                                     )}>Recommended · Automatic</div>
                                     <div className="text-[11px] text-[var(--rz-muted)] leading-snug">Paste your LinkedIn URL and we import everything instantly</div>
                                   </button>
@@ -834,12 +834,12 @@ export default function Home() {
                                       "rounded-xl p-3 text-left transition-all border",
                                       linkedinImportType === "pdf"
                                         ? "border-primary bg-primary/10"
-                                        : "border-[var(--rz-border)] bg-[var(--rz-bg)] hover:border-[#2a3f5a]"
+                                        : "border-[var(--rz-border)] bg-[var(--rz-bg)] hover:border-[#333333]"
                                     )}
                                   >
                                     <div className="text-sm mb-1">📄 Upload PDF</div>
                                     <div className={cn("text-[10px] font-bold rounded-full px-1.5 py-0.5 inline-block mb-1.5",
-                                      linkedinImportType === "pdf" ? "bg-primary/20 text-primary" : "bg-[#1e304a] text-[var(--rz-muted)]"
+                                      linkedinImportType === "pdf" ? "bg-primary/20 text-primary" : "bg-[#262626] text-[var(--rz-muted)]"
                                     )}>Manual</div>
                                     <div className="text-[11px] text-[var(--rz-muted)] leading-snug">Export PDF from LinkedIn settings and upload here</div>
                                   </button>
@@ -1165,7 +1165,7 @@ export default function Home() {
                         <button
                           onClick={handleGenerate}
                           disabled={generateMut.isPending}
-                          className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] hover:shadow-[0_0_30px_rgba(240,160,32,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                          className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                         >
                           <Zap className="w-5 h-5 fill-current" /> ⚡ Generate Package
                         </button>
@@ -1330,7 +1330,7 @@ export default function Home() {
                   <button
                     onClick={handleGenerate}
                     disabled={generateMut.isPending}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] font-bold text-sm flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(240,160,32,0.35)] transition-all disabled:opacity-60"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] font-bold text-sm flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all disabled:opacity-60"
                   >
                     {generateMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     Regenerate ⚡
@@ -1471,13 +1471,13 @@ export default function Home() {
                                   <button onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.pdf`)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-[var(--rz-accent-text)] rounded-l-lg text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50">
                                     {downloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} PDF
                                   </button>
-                                  <button onClick={() => setShowDownloadMenu(v => !v)} className="px-2 py-1.5 bg-primary/90 text-[var(--rz-accent-text)] rounded-r-lg border-l border-[#070c18]/20 hover:bg-primary transition-colors">
+                                  <button onClick={() => setShowDownloadMenu(v => !v)} className="px-2 py-1.5 bg-primary/90 text-[var(--rz-accent-text)] rounded-r-lg border-l border-black/20 hover:bg-primary transition-colors">
                                     <ChevronDown className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                                 {showDownloadMenu && (
                                   <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl shadow-xl overflow-hidden">
-                                    <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.docx`)} disabled={downloadingDocx} className="w-full flex items-center gap-2 px-4 py-3 text-xs text-foreground hover:bg-[#1e304a]/50 transition-colors">
+                                    <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.docx`)} disabled={downloadingDocx} className="w-full flex items-center gap-2 px-4 py-3 text-xs text-foreground hover:bg-[#262626] transition-colors">
                                       {downloadingDocx ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Word (.docx)
                                     </button>
                                   </div>
@@ -1737,7 +1737,7 @@ export default function Home() {
                           exit={{ opacity: 0, y: 16, scale: 0.96 }}
                           transition={{ duration: 0.2, ease: "easeOut" }}
                           className="w-[380px] h-[520px] rounded-2xl bg-[var(--rz-surface)] border border-[var(--rz-border)] shadow-2xl flex flex-col overflow-hidden"
-                          style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(240,160,32,0.08)" }}
+                          style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(37,99,235,0.08)" }}
                         >
                           <div className="flex-shrink-0 px-4 py-3 bg-[var(--rz-bg)] border-b border-[var(--rz-border)] flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
@@ -1856,7 +1856,7 @@ function CopyButton({ text, label = "Copy", minimal = false }: { text: string; l
     );
   }
   return (
-    <button onClick={handleCopy} className="px-3 py-1.5 bg-[var(--rz-surface)] hover:bg-[#1e304a]/50 border border-[var(--rz-border)] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors text-foreground">
+    <button onClick={handleCopy} className="px-3 py-1.5 bg-[var(--rz-surface)] hover:bg-[#262626] border border-[var(--rz-border)] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors text-foreground">
       {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
       {copied ? "Copied!" : label}
     </button>
