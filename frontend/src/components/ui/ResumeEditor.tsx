@@ -295,26 +295,47 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
     setUpdateError(null);
     try {
       if (mode === "latex") {
+        console.log("1. Update clicked — LaTeX mode, length:", rawLatex?.length);
         const result = await onSave(rawLatex);
         if (result.success) { setUpdateStatus("success"); setTimeout(() => setUpdateStatus("idle"), 2000); }
         else { setUpdateStatus("error"); setUpdateError(result.error || "Compilation failed."); }
         return;
       }
+
       // Visual mode: ask Claude to regenerate full LaTeX from structured data
+      console.log("1. Update clicked — visual mode, resumeData:", JSON.stringify(data).substring(0, 200));
+      console.log("2. API call starting...", `${BASE_URL}api/resume/regenerate-from-data`);
+
       const regenRes = await fetch(`${BASE_URL}api/resume/regenerate-from-data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resumeData: data, jd, originalLatex: latex }),
       });
+
+      console.log("3. API response received, status:", regenRes.status);
+
       if (!regenRes.ok) {
         const err = await regenRes.json().catch(() => null);
-        throw new Error(err?.error || "Regeneration failed.");
+        console.error("3a. API error:", err);
+        throw new Error(err?.error || `Regeneration failed (HTTP ${regenRes.status}).`);
       }
-      const { latex: newLatex } = await regenRes.json();
+
+      const responseJson = await regenRes.json();
+      const newLatex: string = responseJson.latex;
+      console.log("4. New latex length:", newLatex?.length, "valid:", newLatex?.includes("\\documentclass"));
+
+      if (!newLatex) {
+        throw new Error("Backend returned empty LaTeX. Please try again.");
+      }
+
+      console.log("5. Triggering PDF recompile...");
       const result = await onSave(newLatex);
+      console.log("6. onSave result:", result);
+
       if (result.success) { setUpdateStatus("success"); setTimeout(() => setUpdateStatus("idle"), 2500); }
       else { setUpdateStatus("error"); setUpdateError(result.error || "Could not compile the generated resume."); }
     } catch (e: unknown) {
+      console.error("handleUpdate error:", e);
       setUpdateStatus("error");
       setUpdateError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
