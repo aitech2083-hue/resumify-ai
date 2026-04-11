@@ -1,6 +1,14 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
 import { anthropic } from "../lib/anthropic.js";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { writeFile, readFile, rm, mkdir } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { randomUUID } from "crypto";
+
+const execFileAsync = promisify(execFile);
 
 const router: IRouter = Router();
 const upload = multer({
@@ -1006,6 +1014,60 @@ router.post(
       res.status(500).json({
         error: err instanceof Error ? err.message : "Agent request failed.",
       });
+    }
+  },
+);
+
+// ── Fast compile-only (single pdflatex pass, returns base64 PDF) ─────────────
+// Used by the visual editor Update Preview — no Claude call, just compile.
+router.post(
+  "/compile-only",
+  async (req: Request, res: Response) => {
+    const { latex } = req.body as { latex?: string };
+
+    if (!latex || typeof latex !== "string" || latex.trim().length < 50) {
+      res.status(400).json({ error: "Invalid LaTeX provided" });
+      return;
+    }
+
+    const workDir = join(tmpdir(), `rezai-compile-${randomUUID()}`);
+    const texFile = join(workDir, "resume.tex");
+    const pdfFile = join(workDir, "resume.pdf");
+
+    try {
+      await mkdir(workDir, { recursive: true });
+      await writeFile(texFile, latex, "utf-8");
+
+      // Single pdflatex pass — sufficient for plain resumes (no TOC/refs)
+      try {
+        await execFileAsync(
+          "pdflatex",
+          ["-interaction=nonstopmode", "-output-directory", workDir, texFile],
+          { timeout: 25000 },
+        );
+      } catch (compileErr: unknown) {
+        // pdflatex exits non-zero on warnings too — check if PDF was still produced
+        req.log.warn({ err: compileErr }, "pdflatex exited non-zero (may still have produced PDF)");
+      }
+
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await readFile(pdfFile);
+      } catch {
+        res.status(500).json({ error: "PDF compilation failed. Check LaTeX syntax." });
+        return;
+      }
+
+      const pdfBase64 = pdfBuffer.toString("base64");
+      res.json({ success: true, pdf: pdfBase64 });
+    } catch (err: unknown) {
+      req.log.error({ err }, "compile-only failed");
+      res.status(500).json({
+        error: "Compilation failed",
+        details: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      rm(workDir, { recursive: true, force: true }).catch(() => {});
     }
   },
 );

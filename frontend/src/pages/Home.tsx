@@ -1509,20 +1509,34 @@ export default function Home() {
                                 latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
                                 jd={jds[activeJdTab]}
                                 onSave={async (updatedLatex: string) => {
-                                  console.log("5. onSave triggered, latex length:", updatedLatex?.length);
+                                  // Fast path: single pdflatex pass, returns base64 JSON
+                                  // (no Claude API call — ResumeEditor already built the LaTeX in JS)
                                   setEditableLatex(prev => ({ ...prev, [activeJdTab]: updatedLatex }));
                                   setPreviewLoading(prev => ({ ...prev, [activeJdTab]: true }));
-                                  console.log("5a. Compiling LaTeX to PDF...");
-                                  const blob = await compileLatexToBlob(updatedLatex);
-                                  setPreviewLoading(prev => ({ ...prev, [activeJdTab]: false }));
-                                  console.log("6. Compile result — blob:", blob ? `${blob.size} bytes` : "null");
-                                  if (!blob) {
-                                    return { success: false, error: "Could not compile the resume. Please try again." };
+                                  try {
+                                    const baseUrl = import.meta.env.BASE_URL || "/";
+                                    const res = await fetch(`${baseUrl}api/resume/compile-only`, {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ latex: updatedLatex }),
+                                    });
+                                    const data = await res.json();
+                                    if (!res.ok || !data.success || !data.pdf) {
+                                      return { success: false, error: data.error || "Compilation failed." };
+                                    }
+                                    // Decode base64 → Blob
+                                    const byteChars = atob(data.pdf);
+                                    const byteArr = new Uint8Array(byteChars.length);
+                                    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+                                    const blob = new Blob([byteArr], { type: "application/pdf" });
+                                    setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
+                                    setResumeViewMode("preview");
+                                    return { success: true };
+                                  } catch (e: unknown) {
+                                    return { success: false, error: e instanceof Error ? e.message : "Could not compile." };
+                                  } finally {
+                                    setPreviewLoading(prev => ({ ...prev, [activeJdTab]: false }));
                                   }
-                                  setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
-                                  setResumeViewMode("preview");
-                                  console.log("6. PDF blob updated, switched to preview tab");
-                                  return { success: true };
                                 }}
                               />
                             )}
