@@ -41,6 +41,39 @@ export interface AtsScore {
   breakdown: string;
 }
 
+export interface HealthCheck {
+  name: string;
+  passed: boolean;
+  score: number;
+  tip: string;
+}
+
+export interface HealthScore {
+  overall: number;
+  checks: HealthCheck[];
+}
+
+export interface JobFitDimension {
+  name: string;
+  score: number;
+  label: string;
+}
+
+export interface JobFitGap {
+  skill: string;
+  severity: string;
+  fix: string;
+}
+
+export interface JobFit {
+  grade: string;
+  score: number;
+  verdict: string;
+  shouldApply: boolean;
+  dimensions: JobFitDimension[];
+  gaps: JobFitGap[];
+}
+
 export interface JobResult {
   jdIndex: number;
   company: string;
@@ -52,6 +85,8 @@ export interface JobResult {
   missing_keywords: string[];
   email: string;
   coverLetter: string;
+  healthScore: HealthScore | null;
+  jobFit: JobFit | null;
 }
 
 export interface LinkedInContent {

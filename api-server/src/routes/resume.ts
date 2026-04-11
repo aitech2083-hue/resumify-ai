@@ -61,6 +61,39 @@ interface AtsScore {
   breakdown: string;
 }
 
+interface HealthCheck {
+  name: string;
+  passed: boolean;
+  score: number;
+  tip: string;
+}
+
+interface HealthScore {
+  overall: number;
+  checks: HealthCheck[];
+}
+
+interface JobFitDimension {
+  name: string;
+  score: number;
+  label: string;
+}
+
+interface JobFitGap {
+  skill: string;
+  severity: string;
+  fix: string;
+}
+
+interface JobFit {
+  grade: string;
+  score: number;
+  verdict: string;
+  shouldApply: boolean;
+  dimensions: JobFitDimension[];
+  gaps: JobFitGap[];
+}
+
 interface JobResult {
   jdIndex: number;
   company: string;
@@ -72,6 +105,8 @@ interface JobResult {
   missing_keywords: string[];
   email: string;
   coverLetter: string;
+  healthScore: HealthScore | null;
+  jobFit: JobFit | null;
 }
 
 interface LinkedInContent {
@@ -314,6 +349,12 @@ async function generateResumeAndATS(
     "<KEYWORDS_MISSING>",
     "[comma separated list of important keywords from the JD that are completely missing from the resume]",
     "</KEYWORDS_MISSING>",
+    "<HEALTH_SCORE>",
+    `{"overall":[integer 0-100],"checks":[{"name":"Quantified bullets","passed":[true/false],"score":[0-100],"tip":"[specific feedback]"},{"name":"Weak verbs removed","passed":[true/false],"score":[0-100],"tip":"[specific feedback]"},{"name":"No pronouns","passed":[true/false],"score":[0-100],"tip":"[specific feedback]"},{"name":"Keywords matched","passed":[true/false],"score":[0-100],"tip":"[specific feedback]"},{"name":"Summary length","passed":[true/false],"score":[0-100],"tip":"[specific feedback]"},{"name":"Action verbs","passed":[true/false],"score":[0-100],"tip":"[specific feedback]"}]}`,
+    "</HEALTH_SCORE>",
+    "<JOB_FIT>",
+    `{"grade":"[A+/A/B+/B/C+/C]","score":[1.0-5.0],"verdict":"[one-line verdict]","shouldApply":[true/false],"dimensions":[{"name":"Role Match","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Skills Match","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Seniority Fit","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Salary Range","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Work Mode","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Interview Probability","score":[0-100],"label":"[High/Moderate/Low]"}],"gaps":[{"skill":"[skill name]","severity":"[High/Medium/Low]","fix":"[one-line actionable fix]"}]}`,
+    "</JOB_FIT>",
   ].join("\n");
 
   const jdBlock = `TARGET ROLE: ${jd.title || "Position"} at ${jd.company || "Company"}\n\nJOB DESCRIPTION:\n${jd.text}`;
@@ -330,12 +371,23 @@ async function generateResumeAndATS(
       .map((k) => k.trim())
       .filter(Boolean);
 
+  const parseJsonTag = (tag: string) => {
+    const content = extractTag(raw, tag);
+    if (!content) return null;
+    try { return JSON.parse(content.trim()); } catch { return null; }
+  };
+
+  const healthScore = parseJsonTag("HEALTH_SCORE");
+  const jobFit = parseJsonTag("JOB_FIT");
+
   return {
     latex,
     atsOriginal: { score: parseScore(before), breakdown: parseBreakdown(before) },
     atsTailored: { score: parseScore(after), breakdown: parseBreakdown(after) },
     matched_keywords: parseKeywords("KEYWORDS_MATCHED"),
     missing_keywords: parseKeywords("KEYWORDS_MISSING"),
+    healthScore: healthScore ?? null,
+    jobFit: jobFit ?? null,
   };
 }
 

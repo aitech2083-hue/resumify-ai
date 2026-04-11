@@ -1549,190 +1549,210 @@ export default function Home() {
                         const r = result.results[activeJdTab];
                         const matched = r.matched_keywords ?? [];
                         const missing = r.missing_keywords ?? [];
-                        const totalKw = matched.length + missing.length;
-                        const kwPct = totalKw > 0 ? Math.round((matched.length / totalKw) * 100) : 0;
-                        const scoreDelta = Math.max(0, r.atsTailored.score - r.atsOriginal.score);
-                        const latex = (editableLatex[activeJdTab] ?? r.latex ?? "").toLowerCase();
+                        const hs = r.healthScore;
+                        const jf = r.jobFit;
+                        const hasNewData = hs !== null && hs !== undefined && jf !== null && jf !== undefined;
 
-                        // ── Resume Health metrics derived from available data ──
-                        const quantPct = Math.min(100, Math.round(r.atsTailored.score * 0.95));
-                        const actionVerbPct = Math.min(100, Math.round(r.atsTailored.score * 0.92));
-                        const weakVerbPct  = Math.max(20, 100 - Math.round(scoreDelta * 1.2));
-                        const noPronounPct = (latex.includes(" i ") || latex.includes("\\ni ") || latex.match(/^i /m)) ? 70 : 100;
-                        const summaryPct   = (latex.includes("summary") || latex.includes("profile") || latex.includes("objective")) ? 90 : 40;
+                        if (!hasNewData) {
+                          return (
+                            <div style={{ maxWidth: 700, margin: "0 auto", padding: "40px 0", textAlign: "center" }}>
+                              <div style={{ background: "var(--rz-surface)", border: "1px solid var(--rz-border)", borderRadius: 14, padding: "40px 32px" }}>
+                                <div style={{ fontSize: 36, marginBottom: 12 }}>📊</div>
+                                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--rz-fg, #ffffff)", marginBottom: 8 }}>Full dashboard not available</div>
+                                <div style={{ fontSize: 13, color: "var(--rz-muted)", marginBottom: 24, lineHeight: 1.6 }}>
+                                  Regenerate your resume to see<br />health score and job fit analysis
+                                </div>
+                                {/* Fallback: show old ATS content */}
+                                <div style={{ marginBottom: 20 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 16, justifyContent: "center", marginBottom: 8 }}>
+                                    <div style={{ textAlign: "center" }}>
+                                      <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "monospace", color: "#888" }}>{r.atsOriginal.score}</div>
+                                      <div style={{ fontSize: 10, color: "#666" }}>Before</div>
+                                    </div>
+                                    <div style={{ fontSize: 18, color: "#2563eb" }}>→</div>
+                                    <div style={{ textAlign: "center" }}>
+                                      <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "monospace", color: "#2563eb" }}>{r.atsTailored.score}</div>
+                                      <div style={{ fontSize: 10, color: "#666" }}>After ✨</div>
+                                    </div>
+                                  </div>
+                                </div>
+                                {(matched.length > 0 || missing.length > 0) && (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 16 }}>
+                                    {matched.map(kw => (
+                                      <span key={kw} style={{ background: "#0d2818", border: "1px solid #164030", color: "#4ade80", borderRadius: 10, padding: "2px 8px", fontSize: 10 }}>{kw}</span>
+                                    ))}
+                                    {missing.map(kw => (
+                                      <span key={kw} style={{ background: "#2a0808", border: "1px solid #401818", color: "#f87171", borderRadius: 10, padding: "2px 8px", fontSize: 10 }}>{kw}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
 
-                        const healthScore = Math.round((quantPct + actionVerbPct + (100 - weakVerbPct) + noPronounPct + summaryPct + kwPct) / 6);
-
-                        const healthMetrics = [
-                          { label: "Quantified bullets", pct: quantPct,         pass: quantPct >= 70 },
-                          { label: "Weak verbs removed", pct: 100-weakVerbPct,  pass: weakVerbPct <= 40 },
-                          { label: "No first-person",    pct: noPronounPct,      pass: noPronounPct >= 90 },
-                          { label: "Keywords matched",   pct: kwPct,             pass: kwPct >= 70 },
-                          { label: "Summary present",    pct: summaryPct,        pass: summaryPct >= 70 },
-                          { label: "Action verbs",       pct: actionVerbPct,     pass: actionVerbPct >= 80 },
-                        ];
-
-                        // ── Job Fit ──
-                        const roleMatch    = Math.min(100, Math.round(kwPct * 0.85 + r.atsTailored.score * 0.15));
-                        const skillsMatch  = Math.min(100, Math.round(kwPct * 0.7  + r.atsTailored.score * 0.3));
-                        const seniorityFit = Math.min(100, Math.round(r.atsTailored.score * 0.9 + 10));
-                        const fitAvg       = (roleMatch + skillsMatch + seniorityFit) / 3;
-                        const fitGrade     = fitAvg >= 90 ? "A+" : fitAvg >= 83 ? "A" : fitAvg >= 76 ? "B+" : fitAvg >= 68 ? "B" : fitAvg >= 60 ? "C+" : "C";
-                        const fitOutOf5    = (fitAvg / 100 * 5).toFixed(1);
-
-                        const healthColor = healthScore >= 80 ? "#22c55e" : healthScore >= 60 ? "#f59e0b" : "#ef4444";
-                        const scoreColor  = (s: number) => s >= 80 ? "#22c55e" : s >= 60 ? "#f59e0b" : "#ef4444";
+                        const healthColor = hs.overall >= 80 ? "#4ade80" : hs.overall >= 60 ? "#fbbf24" : "#f87171";
+                        const barColor = (s: number) => s >= 80 ? "#4ade80" : s >= 60 ? "#60a5fa" : "#fbbf24";
 
                         return (
-                          <div className="max-w-3xl mx-auto space-y-4">
+                          <div style={{ maxWidth: 860, margin: "0 auto" }}>
 
-                            {/* ── ROW 1: Resume Health + ATS Scores ── */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-                              {/* Resume Health card */}
-                              <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-5">
-                                <div className="flex items-center justify-between mb-4">
-                                  <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--rz-muted)]">Resume Health</span>
-                                  <span className="text-2xl font-mono font-bold" style={{ color: healthColor }}>{healthScore}<span className="text-sm text-[var(--rz-muted)] font-normal">/100</span></span>
-                                </div>
-                                <div className="space-y-2.5">
-                                  {healthMetrics.map(m => (
-                                    <div key={m.label} className="flex items-center gap-2">
-                                      <span style={{ color: m.pass ? "#22c55e" : "#ef4444", fontSize: 11, flexShrink: 0 }}>{m.pass ? "✓" : "✗"}</span>
-                                      <span className="text-xs text-[var(--rz-muted)] w-36 flex-shrink-0">{m.label}</span>
-                                      <div className="flex-1 h-1.5 bg-[var(--rz-bg)] rounded-full overflow-hidden">
-                                        <motion.div
-                                          initial={{ width: 0 }}
-                                          animate={{ width: `${m.pct}%` }}
-                                          transition={{ duration: 0.8, ease: "easeOut" }}
-                                          className="h-full rounded-full"
-                                          style={{ background: m.pass ? "#22c55e" : "#ef4444" }}
-                                        />
-                                      </div>
-                                      <span className="text-[10px] font-mono text-[var(--rz-muted)] w-8 text-right flex-shrink-0">{m.pct}%</span>
-                                    </div>
-                                  ))}
+                            {/* ── SECTION 1: 4 Score Cards ── */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+                              {/* Card 1: Resume Health */}
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 14 }}>
+                                <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>HEALTH</div>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+                                  <span style={{ fontSize: 26, fontWeight: 700, color: healthColor, fontFamily: "monospace" }}>{hs.overall}</span>
+                                  <span style={{ fontSize: 10, color: "#666666" }}>/100</span>
                                 </div>
                               </div>
-
-                              {/* ATS Before → After card */}
-                              <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-5 flex flex-col gap-4">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--rz-muted)]">ATS Score</span>
-                                <div className="flex items-end gap-4">
-                                  {/* Before */}
-                                  <div className="text-center flex-1">
-                                    <div className="text-3xl font-mono font-bold text-[var(--rz-muted)]">{r.atsOriginal.score}</div>
-                                    <div className="w-full h-1.5 bg-[var(--rz-bg)] rounded-full overflow-hidden mt-2 mb-1">
-                                      <motion.div initial={{ width: 0 }} animate={{ width: `${r.atsOriginal.score}%` }} transition={{ duration: 0.8 }} className="h-full rounded-full bg-[var(--rz-muted)]" />
-                                    </div>
-                                    <div className="text-[10px] text-[var(--rz-muted)]">Before</div>
-                                  </div>
-                                  {/* Arrow + delta */}
-                                  <div className="flex flex-col items-center gap-1 pb-4">
-                                    <span className="px-2 py-0.5 rounded-full bg-success/15 border border-success/25 text-success text-xs font-bold">+{scoreDelta}</span>
-                                    <ChevronRight className="w-5 h-5 text-primary" />
-                                  </div>
-                                  {/* After */}
-                                  <div className="text-center flex-1">
-                                    <div className="text-3xl font-mono font-bold text-primary">{r.atsTailored.score}</div>
-                                    <div className="w-full h-1.5 bg-[var(--rz-bg)] rounded-full overflow-hidden mt-2 mb-1">
-                                      <motion.div initial={{ width: 0 }} animate={{ width: `${r.atsTailored.score}%` }} transition={{ duration: 0.8, delay: 0.2 }} className="h-full rounded-full bg-primary" />
-                                    </div>
-                                    <div className="text-[10px] text-primary/70">After ✨</div>
-                                  </div>
+                              {/* Card 2: ATS Before */}
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 14 }}>
+                                <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>ATS BEFORE</div>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+                                  <span style={{ fontSize: 26, fontWeight: 700, color: "#f87171", fontFamily: "monospace" }}>{r.atsOriginal.score}</span>
+                                  <span style={{ fontSize: 10, color: "#666666" }}>/100</span>
                                 </div>
-                                <div className="bg-[var(--rz-bg)] rounded-lg px-3 py-2 text-xs text-[var(--rz-muted)] leading-relaxed flex-1">
-                                  {r.atsTailored.breakdown || "Resume optimised for ATS."}
+                              </div>
+                              {/* Card 3: ATS After */}
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 14 }}>
+                                <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>ATS AFTER</div>
+                                <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+                                  <span style={{ fontSize: 26, fontWeight: 700, color: "#4ade80", fontFamily: "monospace" }}>{r.atsTailored.score}</span>
+                                  <span style={{ fontSize: 10, color: "#666666" }}>/100</span>
                                 </div>
+                              </div>
+                              {/* Card 4: Job Fit */}
+                              <div style={{ background: "#0d1a2e", border: "1px solid #1e3a5f", borderRadius: 10, padding: 14 }}>
+                                <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>JOB FIT</div>
+                                <div style={{ fontSize: 26, fontWeight: 700, color: "#60a5fa", fontFamily: "monospace", lineHeight: 1 }}>{jf.grade}</div>
+                                <div style={{ fontSize: 10, color: "#666666", marginTop: 2 }}>{jf.score}/5.0</div>
                               </div>
                             </div>
 
-                            {/* ── ROW 2: Keywords ── */}
-                            {(matched.length > 0 || missing.length > 0) && (
-                              <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-5">
-                                <div className="flex items-center justify-between mb-3">
-                                  <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--rz-muted)]">Keywords</span>
-                                  <span className="text-xs font-semibold" style={{ color: scoreColor(kwPct) }}>{matched.length}/{totalKw} matched ({kwPct}%)</span>
-                                </div>
-                                <div className="flex flex-wrap gap-1.5 mb-3">
-                                  {matched.map(kw => (
-                                    <span key={kw} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-success/10 text-success border border-success/20">
-                                      <Check className="w-2.5 h-2.5" />{kw}
-                                    </span>
-                                  ))}
-                                  {missing.map(kw => (
-                                    <span key={kw} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-destructive/10 text-destructive border border-destructive/20">
-                                      <X className="w-2.5 h-2.5" />{kw}
-                                    </span>
-                                  ))}
-                                </div>
-                                {missing.length > 0 && (
-                                  <button onClick={() => handleFixWithAgent(missing)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">
-                                    <Zap className="w-3 h-3 fill-current" /> Fix with RezAI Agent
-                                  </button>
-                                )}
-                              </div>
-                            )}
+                            {/* ── SECTION 2: Two Column Grid ── */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
 
-                            {/* ── ROW 3: Job Fit ── */}
-                            <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-5">
-                              <div className="flex items-center justify-between mb-4">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--rz-muted)]">Job Fit</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-2xl font-mono font-bold text-primary">{fitGrade}</span>
-                                  <span className="text-sm text-[var(--rz-muted)]">{fitOutOf5}/5</span>
-                                </div>
-                              </div>
-
-                              {fitAvg >= 75 && (
-                                <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
-                                  <Check className="w-3.5 h-3.5 text-success flex-shrink-0" />
-                                  <span className="text-xs text-success font-medium">Apply with confidence — strong match for this role</span>
-                                </div>
-                              )}
-
-                              <div className="space-y-2.5 mb-4">
-                                {[
-                                  { label: "Role Match",     pct: roleMatch },
-                                  { label: "Skills Match",   pct: skillsMatch },
-                                  { label: "Seniority Fit",  pct: seniorityFit },
-                                ].map(m => (
-                                  <div key={m.label} className="flex items-center gap-2">
-                                    <span className="text-xs text-[var(--rz-muted)] w-24 flex-shrink-0">{m.label}</span>
-                                    <div className="flex-1 h-1.5 bg-[var(--rz-bg)] rounded-full overflow-hidden">
-                                      <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${m.pct}%` }}
-                                        transition={{ duration: 0.9, ease: "easeOut" }}
-                                        className="h-full rounded-full bg-primary"
-                                      />
+                              {/* LEFT: 6 Health Checks */}
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 16 }}>
+                                <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>6 health checks</div>
+                                {hs.checks.map((check) => (
+                                  <div key={check.name} style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                                    <div style={{
+                                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                                      background: check.passed ? "#0d2818" : "#2a0808",
+                                      color: check.passed ? "#4ade80" : "#f87171",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      fontSize: 10, fontWeight: 700, marginTop: 1
+                                    }}>
+                                      {check.passed ? "✓" : "✗"}
                                     </div>
-                                    <span className="text-[10px] font-mono text-[var(--rz-muted)] w-8 text-right flex-shrink-0">{m.pct}%</span>
+                                    <div>
+                                      <div style={{ fontSize: 11, color: "#ffffff", fontWeight: 500 }}>{check.name}</div>
+                                      <div style={{ fontSize: 10, color: "#666666", marginTop: 1 }}>{check.tip}</div>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
 
-                              {/* Gaps */}
-                              {missing.length > 0 && (
-                                <div>
-                                  <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--rz-muted)] mb-2">Gaps</div>
-                                  <div className="space-y-1.5">
-                                    {missing.slice(0, 3).map(kw => (
-                                      <div key={kw} className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-1.5 text-xs text-[var(--rz-muted)]">
-                                          <span className="text-warning">⚠</span>
-                                          <span>{kw}</span>
-                                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-warning/10 text-warning border border-warning/20">Medium</span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <button onClick={() => handleFixWithAgent(missing)} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary text-xs font-bold hover:bg-primary/20 transition-colors">
-                                    <Zap className="w-3 h-3 fill-current" /> Fix with RezAI Agent
-                                  </button>
+                              {/* RIGHT: Job Fit Dimensions + Gaps */}
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 16 }}>
+                                {/* Verdict badge */}
+                                <div style={{
+                                  display: "inline-flex", alignItems: "center", gap: 6,
+                                  background: jf.shouldApply ? "#0d2818" : "#1a1400",
+                                  color: jf.shouldApply ? "#4ade80" : "#fbbf24",
+                                  border: jf.shouldApply ? "1px solid #164030" : "1px solid #3a2a10",
+                                  borderRadius: 8, padding: "5px 10px", fontSize: 10, fontWeight: 600,
+                                  marginBottom: 12
+                                }}>
+                                  {jf.shouldApply ? "✓ Apply with confidence" : "⚠ Apply with caution"}
                                 </div>
-                              )}
+
+                                {/* 6 Dimension bars */}
+                                <div style={{ marginBottom: 10 }}>
+                                  {jf.dimensions.map((dim) => {
+                                    const bc = barColor(dim.score);
+                                    return (
+                                      <div key={dim.name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+                                        <span style={{ fontSize: 10, color: "#888888", width: 110, flexShrink: 0 }}>{dim.name}</span>
+                                        <div style={{ flex: 1, height: 5, background: "#1e1e1e", borderRadius: 3, overflow: "hidden" }}>
+                                          <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${dim.score}%` }}
+                                            transition={{ duration: 0.8, ease: "easeOut" }}
+                                            style={{ height: "100%", background: bc, borderRadius: 3 }}
+                                          />
+                                        </div>
+                                        <span style={{ fontSize: 10, color: bc, width: 60, textAlign: "right", flexShrink: 0 }}>{dim.label}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Divider */}
+                                {jf.gaps.length > 0 && (
+                                  <>
+                                    <div style={{ borderTop: "1px solid #1e1e1e", margin: "10px 0" }} />
+                                    <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>GAPS TO ADDRESS</div>
+                                    {jf.gaps.map((gap) => {
+                                      const sevColor = gap.severity === "High" ? "#f87171" : gap.severity === "Medium" ? "#fbbf24" : "#4ade80";
+                                      return (
+                                        <div key={gap.skill} style={{ background: "#1a1208", border: "1px solid #3a2a10", borderRadius: 8, padding: 10, marginBottom: 6 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                            <span style={{ fontSize: 11, fontWeight: 600, color: "#ffffff" }}>{gap.skill}</span>
+                                            <span style={{ fontSize: 9, color: sevColor, background: "rgba(0,0,0,0.3)", border: `1px solid ${sevColor}40`, borderRadius: 4, padding: "1px 5px" }}>{gap.severity}</span>
+                                          </div>
+                                          <div style={{ fontSize: 10, color: "#888888", marginBottom: 6 }}>{gap.fix}</div>
+                                          <button
+                                            onClick={() => {
+                                              setActiveFeatureTab("agent");
+                                              setTimeout(() => setAgentInput(`Please add ${gap.skill} naturally to my resume`), 100);
+                                            }}
+                                            style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: 5, padding: "3px 10px", fontSize: 9, fontWeight: 600, cursor: "pointer" }}
+                                          >
+                                            Fix with Agent
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </>
+                                )}
+                              </div>
                             </div>
+
+                            {/* ── SECTION 3: Keywords Full Width ── */}
+                            {(matched.length > 0 || missing.length > 0) && (
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 16 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                                  <div>
+                                    <div style={{ fontSize: 10, color: "#4ade80", marginBottom: 8, fontWeight: 600 }}>Keywords found</div>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                      {matched.map(kw => (
+                                        <span key={kw} style={{ background: "#0d2818", border: "1px solid #164030", color: "#4ade80", borderRadius: 10, padding: "2px 8px", fontSize: 10 }}>{kw}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: 10, color: "#f87171", marginBottom: 8, fontWeight: 600 }}>Missing keywords</div>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                      {missing.map(kw => (
+                                        <span key={kw} style={{ background: "#2a0808", border: "1px solid #401818", color: "#f87171", borderRadius: 10, padding: "2px 8px", fontSize: 10 }}>{kw}</span>
+                                      ))}
+                                    </div>
+                                    {missing.length > 0 && (
+                                      <button
+                                        onClick={() => handleFixWithAgent(missing)}
+                                        style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.25)", color: "#2563eb", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                      >
+                                        ⚡ Fix with RezAI Agent
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
                           </div>
                         );
