@@ -261,6 +261,73 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
   const [certInput, setCertInput] = useState("");
   const parsedForLatex = useRef<string>("");
 
+  // ── Undo / Redo ──────────────────────────────────────────────────────────
+  const [editHistory, setEditHistory] = useState<VisualResumeData[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
+  const saveToHistory = (currentData: VisualResumeData) => {
+    const newHistory = editHistory.slice(0, historyIndex + 1);
+    newHistory.push(JSON.parse(JSON.stringify(currentData)));
+    if (newHistory.length > 20) newHistory.shift();
+    setEditHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  /** Wrap all user edits: saves current state to history then applies updater */
+  const updateData = (updater: (prev: VisualResumeData) => VisualResumeData) => {
+    saveToHistory(data);
+    setData(updater);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex <= 0) return;
+    const newIndex = historyIndex - 1;
+    setHistoryIndex(newIndex);
+    setData(JSON.parse(JSON.stringify(editHistory[newIndex])));
+  };
+
+  const handleRedo = () => {
+    if (historyIndex >= editHistory.length - 1) return;
+    const newIndex = historyIndex + 1;
+    setHistoryIndex(newIndex);
+    setData(JSON.parse(JSON.stringify(editHistory[newIndex])));
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyIndex, editHistory]);
+
+  // ── Loading message (skeleton) ────────────────────────────────────────────
+  const [loadingMessage, setLoadingMessage] = useState('Loading your resume editor...');
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (parseStatus !== 'loading') { setLoadingTimedOut(false); return; }
+    setLoadingMessage('Loading your resume editor...');
+    setLoadingTimedOut(false);
+    const t1 = setTimeout(() => setLoadingMessage('Almost there, parsing your data...'), 5000);
+    const t2 = setTimeout(() => setLoadingMessage('Taking a bit longer than usual...'), 10000);
+    const t3 = setTimeout(() => setLoadingMessage('Still working on it...'), 15000);
+    const t4 = setTimeout(() => setLoadingTimedOut(true), 20000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+  }, [parseStatus]);
+
   // Auto-parse when entering visual mode for the first time
   useEffect(() => {
     if (mode !== "visual" || parseStatus !== "idle") return;
@@ -342,39 +409,39 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
   // ── State helpers ──────────────────────────────────────────────────────────
 
   const updExp = (id: string, field: keyof ExperienceEntry, value: string) =>
-    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, [field]: value } : e) }));
+    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, [field]: value } : e) }));
   const updExpBullet = (id: string, bi: number, v: string) =>
-    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.map((b, i) => i === bi ? v : b) } : e) }));
+    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.map((b, i) => i === bi ? v : b) } : e) }));
   const addExpBullet = (id: string) =>
-    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: [...e.bullets, ""] } : e) }));
+    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: [...e.bullets, ""] } : e) }));
   const removeExpBullet = (id: string, bi: number) =>
-    setData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.filter((_, i) => i !== bi) } : e) }));
+    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.filter((_, i) => i !== bi) } : e) }));
   const addExperience = () =>
-    setData(d => ({ ...d, experience: [...d.experience, { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""] }] }));
+    updateData(d => ({ ...d, experience: [...d.experience, { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""] }] }));
   const removeExperience = (id: string) => {
     if (!confirm("Remove this experience entry?")) return;
-    setData(d => ({ ...d, experience: d.experience.filter(e => e.id !== id) }));
+    updateData(d => ({ ...d, experience: d.experience.filter(e => e.id !== id) }));
   };
   const updEdu = (id: string, field: keyof EducationEntry, v: string) =>
-    setData(d => ({ ...d, education: d.education.map(e => e.id === id ? { ...e, [field]: v } : e) }));
+    updateData(d => ({ ...d, education: d.education.map(e => e.id === id ? { ...e, [field]: v } : e) }));
   const addEducation = () =>
-    setData(d => ({ ...d, education: [...d.education, { id: uuidv4(), degree: "", institution: "", year: "" }] }));
+    updateData(d => ({ ...d, education: [...d.education, { id: uuidv4(), degree: "", institution: "", year: "" }] }));
   const removeEducation = (id: string) =>
-    setData(d => ({ ...d, education: d.education.filter(e => e.id !== id) }));
+    updateData(d => ({ ...d, education: d.education.filter(e => e.id !== id) }));
   const addSkill = () => {
     const s = skillInput.trim();
     if (!s || data.skills.includes(s)) { setSkillInput(""); return; }
-    setData(d => ({ ...d, skills: [...d.skills, s] }));
+    updateData(d => ({ ...d, skills: [...d.skills, s] }));
     setSkillInput("");
   };
-  const removeSkill = (s: string) => setData(d => ({ ...d, skills: d.skills.filter(x => x !== s) }));
+  const removeSkill = (s: string) => updateData(d => ({ ...d, skills: d.skills.filter(x => x !== s) }));
   const addCert = () => {
     const c = certInput.trim();
     if (!c) return;
-    setData(d => ({ ...d, certifications: [...d.certifications, c] }));
+    updateData(d => ({ ...d, certifications: [...d.certifications, c] }));
     setCertInput("");
   };
-  const removeCert = (i: number) => setData(d => ({ ...d, certifications: d.certifications.filter((_, idx) => idx !== i) }));
+  const removeCert = (i: number) => updateData(d => ({ ...d, certifications: d.certifications.filter((_, idx) => idx !== i) }));
 
   // ── Update Preview ─────────────────────────────────────────────────────────
 
@@ -423,6 +490,35 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           <TabButton active={mode === "latex"} onClick={() => { setRawLatex(latex); setMode("latex"); }}
             icon={<Code2 style={{ width: 13, height: 13 }} />} label="LaTeX (Advanced)" />
         </div>
+        {/* Undo / Redo buttons */}
+        {mode === "visual" && parseStatus === "done" && (
+          <div style={{ display: "flex", gap: "4px", marginLeft: "8px" }}>
+            {[
+              { label: "↩", title: "Undo (Ctrl+Z)", disabled: historyIndex <= 0, onClick: handleUndo },
+              { label: "↪", title: "Redo (Ctrl+Y)", disabled: historyIndex >= editHistory.length - 1, onClick: handleRedo },
+            ].map(btn => (
+              <button
+                key={btn.title}
+                onClick={btn.onClick}
+                disabled={btn.disabled}
+                title={btn.title}
+                style={{
+                  width: 32, height: 32, borderRadius: "50%",
+                  background: "#1e1e1e", border: "1px solid #333333",
+                  cursor: btn.disabled ? "not-allowed" : "pointer",
+                  opacity: btn.disabled ? 0.3 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#888888", fontSize: "15px", fontFamily: "inherit",
+                  transition: "border-color 0.15s, color 0.15s",
+                }}
+                onMouseEnter={e => { if (!btn.disabled) { (e.currentTarget as HTMLButtonElement).style.borderColor = "#2563eb"; (e.currentTarget as HTMLButtonElement).style.color = "#ffffff"; } }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#333333"; (e.currentTarget as HTMLButtonElement).style.color = "#888888"; }}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        )}
         {mode === "visual" && parseStatus === "error" && (
           <button onClick={() => { parsedForLatex.current = ""; doParseLatex(); }} style={{ marginLeft: "auto", fontSize: "11px", color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "4px" }}>
             <RefreshCw style={{ width: 12, height: 12 }} /> Retry
@@ -437,11 +533,70 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           spellCheck={false} placeholder="% LaTeX resume source"
           className="custom-scrollbar" />
 
-      /* ── Loading ── */
+      /* ── Loading skeleton ── */
       ) : parseStatus === "loading" ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px", color: "#888888" }}>
-          <Loader2 style={{ width: 28, height: 28 }} className="animate-spin" />
-          <p style={{ fontSize: "13px", margin: 0 }}>Loading editor…</p>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px" }} className="custom-scrollbar">
+          <style>{`
+            @keyframes rezai-shimmer {
+              0%   { opacity: 0.3 }
+              50%  { opacity: 0.7 }
+              100% { opacity: 0.3 }
+            }
+          `}</style>
+          {/* Status header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", padding: "14px 16px", background: "#141414", border: "1px solid #262626", borderRadius: "10px" }}>
+            <Loader2 style={{ width: 18, height: 18, color: "#2563eb", flexShrink: 0 }} className="animate-spin" />
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: "13px", color: "#ffffff", fontWeight: 600 }}>{loadingMessage}</p>
+              <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#666666" }}>Parsing resume data (5–10 sec)</p>
+            </div>
+          </div>
+          {/* Timeout fallback */}
+          {loadingTimedOut && (
+            <div style={{ background: "#141414", border: "1px solid #333333", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px" }}>
+              <p style={{ margin: "0 0 10px 0", fontSize: "13px", color: "#ffffff" }}>Taking too long?</p>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => { parsedForLatex.current = ""; doParseLatex(); }}
+                  style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 14px", background: "#1e1e1e", border: "1px solid #333333", borderRadius: "8px", fontSize: "12px", color: "#ffffff", cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  <RefreshCw style={{ width: 12, height: 12 }} /> Try again
+                </button>
+                <button
+                  onClick={() => { setRawLatex(latex); setMode("latex"); }}
+                  style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 14px", background: "#2563eb", border: "none", borderRadius: "8px", fontSize: "12px", color: "#ffffff", cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  Use LaTeX editor →
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Skeleton sections */}
+          {[
+            { title: "Personal Information", rows: [["full"], ["half", "half"], ["half", "half"]] },
+            { title: "Experience", rows: [["full"], ["full"], ["full"], ["full"]] },
+            { title: "Education", rows: [["full"], ["half", "half"]] },
+            { title: "Skills", rows: [["quarter", "third", "quarter", "quarter"]] },
+          ].map(section => (
+            <div key={section.title} style={{ background: "#141414", border: "1px solid #262626", borderRadius: "12px", padding: "20px", marginBottom: "16px" }}>
+              {/* Section label */}
+              <div style={{ width: "90px", height: "10px", background: "#1e1e1e", borderRadius: "4px", marginBottom: "14px", animation: "rezai-shimmer 1.5s ease-in-out infinite" }} />
+              {/* Rows */}
+              {section.rows.map((row, ri) => (
+                <div key={ri} style={{ display: "flex", gap: "10px", marginBottom: ri < section.rows.length - 1 ? "10px" : 0 }}>
+                  {row.map((size, ci) => (
+                    <div key={ci} style={{
+                      flex: size === "full" ? "1 1 100%" : size === "half" ? "1 1 50%" : size === "third" ? "1 1 33%" : "1 1 25%",
+                      height: "40px", background: "#1e1e1e", borderRadius: "6px",
+                      animation: `rezai-shimmer 1.5s ease-in-out infinite`,
+                      animationDelay: `${(ri * row.length + ci) * 0.1}s`,
+                    }} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+          <div style={{ height: "80px" }} />
         </div>
 
       /* ── Visual editor (parse error = show fallback empty form, or success = show populated form) ── */
@@ -474,30 +629,30 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div style={{ gridColumn: "1 / -1" }}>
                 <FieldLabel>Full Name</FieldLabel>
-                <EditorInput value={data.personalInfo.name} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, name: v } }))} placeholder="John Doe" />
+                <EditorInput value={data.personalInfo.name} onChange={v => updateData(d => ({ ...d, personalInfo: { ...d.personalInfo, name: v } }))} placeholder="John Doe" />
               </div>
               <div>
                 <FieldLabel>Email</FieldLabel>
-                <EditorInput value={data.personalInfo.email} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, email: v } }))} placeholder="john@example.com" type="email" />
+                <EditorInput value={data.personalInfo.email} onChange={v => updateData(d => ({ ...d, personalInfo: { ...d.personalInfo, email: v } }))} placeholder="john@example.com" type="email" />
               </div>
               <div>
                 <FieldLabel>Phone</FieldLabel>
-                <EditorInput value={data.personalInfo.phone} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, phone: v } }))} placeholder="+1 (555) 000-0000" />
+                <EditorInput value={data.personalInfo.phone} onChange={v => updateData(d => ({ ...d, personalInfo: { ...d.personalInfo, phone: v } }))} placeholder="+1 (555) 000-0000" />
               </div>
               <div>
                 <FieldLabel>Location</FieldLabel>
-                <EditorInput value={data.personalInfo.location} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, location: v } }))} placeholder="New York, NY" />
+                <EditorInput value={data.personalInfo.location} onChange={v => updateData(d => ({ ...d, personalInfo: { ...d.personalInfo, location: v } }))} placeholder="New York, NY" />
               </div>
               <div>
                 <FieldLabel>LinkedIn URL</FieldLabel>
-                <EditorInput value={data.personalInfo.linkedin} onChange={v => setData(d => ({ ...d, personalInfo: { ...d.personalInfo, linkedin: v } }))} placeholder="linkedin.com/in/johndoe" />
+                <EditorInput value={data.personalInfo.linkedin} onChange={v => updateData(d => ({ ...d, personalInfo: { ...d.personalInfo, linkedin: v } }))} placeholder="linkedin.com/in/johndoe" />
               </div>
             </div>
           </SectionCard>
 
           {/* Summary */}
           <SectionCard title="Professional Summary">
-            <EditorTextarea value={data.summary} onChange={v => setData(d => ({ ...d, summary: v }))} placeholder="Results-driven professional with…" rows={4} />
+            <EditorTextarea value={data.summary} onChange={v => updateData(d => ({ ...d, summary: v }))} placeholder="Results-driven professional with…" rows={4} />
           </SectionCard>
 
           {/* Experience */}
@@ -610,7 +765,7 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           <SectionCard title="Certifications">
             {data.certifications.map((cert, i) => (
               <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                <EditorInput value={cert} onChange={v => setData(d => ({ ...d, certifications: d.certifications.map((c, ci) => ci === i ? v : c) }))} placeholder="AWS Solutions Architect" />
+                <EditorInput value={cert} onChange={v => updateData(d => ({ ...d, certifications: d.certifications.map((c, ci) => ci === i ? v : c) }))} placeholder="AWS Solutions Architect" />
                 <button onClick={() => removeCert(i)}
                   style={{ background: "none", border: "none", cursor: "pointer", color: "#666666", flexShrink: 0, padding: 0, transition: "color 0.15s" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "#ef4444"; }}

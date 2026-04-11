@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(node_modules/.bin/vite build:*)",
+      "Bash(ls node_modules/.bin/vite*)",
+      "Bash(ls ../node_modules/.bin/vite*)"
+    ]
+  }
+}
