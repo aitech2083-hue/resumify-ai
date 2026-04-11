@@ -553,7 +553,7 @@ export default function Home() {
       {/* ── SLIM NAV (48px) ── */}
       <nav className="flex-shrink-0 h-12 px-5 flex items-center justify-between border-b border-[var(--rz-border)] bg-[var(--rz-surface)]/90 backdrop-blur-sm z-30">
         {/* Logo */}
-        <a href="/app" className="flex items-center gap-2 group">
+        <a href="/" className="flex items-center gap-2 group">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-[var(--rz-accent-hover)] flex items-center justify-center shadow-[0_0_12px_rgba(37,99,235,0.3)]">
             <Zap className="w-4 h-4 text-[var(--rz-accent-text)] fill-current" />
           </div>
