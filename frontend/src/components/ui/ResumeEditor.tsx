@@ -318,7 +318,7 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
   useEffect(() => {
-    if (parseStatus !== 'loading') { setLoadingTimedOut(false); return; }
+    if (parseStatus !== 'loading' && parseStatus !== 'idle') { setLoadingTimedOut(false); return; }
     setLoadingMessage('Loading your resume editor...');
     setLoadingTimedOut(false);
     const t1 = setTimeout(() => setLoadingMessage('Almost there, parsing your data...'), 5000);
@@ -534,7 +534,7 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           className="custom-scrollbar" />
 
       /* ── Loading skeleton ── */
-      ) : parseStatus === "loading" ? (
+      ) : (parseStatus === "loading" || (parseStatus === "idle" && !!latex?.trim())) ? (
         <div style={{ flex: 1, overflowY: "auto", padding: "20px" }} className="custom-scrollbar">
           <style>{`
             @keyframes rezai-shimmer {
