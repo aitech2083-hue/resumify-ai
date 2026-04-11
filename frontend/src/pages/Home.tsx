@@ -108,6 +108,7 @@ export default function Home() {
   // -- UI State --
   const [showChangingJd, setShowChangingJd] = useState(false);
   const [showSidebarExtra, setShowSidebarExtra] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<'classic'|'modern'|'compact'|'executive'>('classic');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [jobTrackerStage, setJobTrackerStage] = useState<string | null>(null);
   const [generateStep, setGenerateStep] = useState(-1);
@@ -211,6 +212,7 @@ export default function Home() {
         scratchData: mode === "scratch" ? scratchData : undefined,
         resumeFile, linkedinFile,
         linkedinProfile: mode === "linkedin" && linkedinImportType === "url" ? linkedinProfile : undefined,
+        template: selectedTemplate,
       });
 
       setResult(data);
@@ -651,10 +653,10 @@ export default function Home() {
               )}
 
               <div className="min-h-full flex items-center justify-center py-10 px-4">
-                <div className="w-full max-w-[560px]">
 
                   {/* ─── GENERATING CARD ─── */}
                   {generateMut.isPending ? (
+                    <div className="w-full max-w-[560px]">
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -709,59 +711,65 @@ export default function Home() {
                         </div>
                       </div>
                     </motion.div>
+                    </div>
                   ) : (
 
-                    /* ─── INPUT CARD ─── */
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-2xl shadow-2xl overflow-hidden"
-                    >
-                      {/* Card header */}
-                      <div className="px-6 pt-6 pb-4 border-b border-[var(--rz-border)]/60">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Zap className="w-4 h-4 text-primary fill-current" />
-                          <span className="text-xs font-bold tracking-widest uppercase text-[var(--rz-muted)]">RezAI — AI Resume Builder</span>
-                        </div>
-                        <h1 className="text-xl font-bold text-foreground">Build your resume package</h1>
-                      </div>
+                    /* ─── INPUT + TEMPLATE GRID ─── */
+                    <div className="w-full" style={{ maxWidth: 1100 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="rz-builder-grid">
+                        <style>{`@media (max-width: 768px) { .rz-builder-grid { grid-template-columns: 1fr !important; } }`}</style>
 
-                      <div className="p-6 space-y-6">
-
-                        {/* Mode selector */}
-                        <div>
-                          <label className="text-[10px] font-bold tracking-widest uppercase text-[var(--rz-muted)] mb-2 block">Resume Source</label>
-                          <div className="flex bg-[var(--rz-bg)] p-1 rounded-xl border border-[var(--rz-border)] gap-1">
-                            {([
-                              { id: "upload", label: "Upload", emoji: "📄" },
-                              { id: "linkedin", label: "LinkedIn", emoji: "💼" },
-                              { id: "scratch", label: "Scratch", emoji: "✏️" },
-                            ] as { id: Mode; label: string; emoji: string }[]).map(m => (
-                              <button
-                                key={m.id}
-                                onClick={() => setMode(m.id)}
-                                className={cn(
-                                  "flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5",
-                                  mode === m.id
-                                    ? "bg-primary text-[var(--rz-accent-text)] shadow-sm"
-                                    : "text-[var(--rz-muted)] hover:text-foreground hover:bg-[var(--rz-surface)]"
-                                )}
-                              >
-                                <span>{m.emoji}</span> {m.label}
-                              </button>
-                            ))}
+                        {/* ── LEFT: Builder card ── */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-2xl shadow-2xl overflow-hidden"
+                        >
+                          {/* Card header */}
+                          <div className="px-6 pt-6 pb-4 border-b border-[var(--rz-border)]/60">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Zap className="w-4 h-4 text-primary fill-current" />
+                              <span className="text-xs font-bold tracking-widest uppercase text-[var(--rz-muted)]">RezAI — AI Resume Builder</span>
+                            </div>
+                            <h1 className="text-xl font-bold text-foreground">Build your resume package</h1>
                           </div>
-                        </div>
 
-                        {/* Mode content */}
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={mode}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            transition={{ duration: 0.18 }}
-                          >
+                          <div className="p-6 space-y-6">
+
+                            {/* Mode selector */}
+                            <div>
+                              <label className="text-[10px] font-bold tracking-widest uppercase text-[var(--rz-muted)] mb-2 block">Resume Source</label>
+                              <div className="flex bg-[var(--rz-bg)] p-1 rounded-xl border border-[var(--rz-border)] gap-1">
+                                {([
+                                  { id: "upload", label: "Upload", emoji: "📄" },
+                                  { id: "linkedin", label: "LinkedIn", emoji: "💼" },
+                                  { id: "scratch", label: "Scratch", emoji: "✏️" },
+                                ] as { id: Mode; label: string; emoji: string }[]).map(m => (
+                                  <button
+                                    key={m.id}
+                                    onClick={() => setMode(m.id)}
+                                    className={cn(
+                                      "flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1.5",
+                                      mode === m.id
+                                        ? "bg-primary text-[var(--rz-accent-text)] shadow-sm"
+                                        : "text-[var(--rz-muted)] hover:text-foreground hover:bg-[var(--rz-surface)]"
+                                    )}
+                                  >
+                                    <span>{m.emoji}</span> {m.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Mode content */}
+                            <AnimatePresence mode="wait">
+                              <motion.div
+                                key={mode}
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                                transition={{ duration: 0.18 }}
+                              >
                             {/* UPLOAD */}
                             {mode === "upload" && (
                               <div className="space-y-4">
@@ -1153,27 +1161,138 @@ export default function Home() {
                           </div>
                         </div>
 
-                      </div>{/* end card body */}
+                          </div>{/* end card body - tone selector */}
 
-                      {/* Card footer */}
-                      <div className="px-6 pb-6 space-y-3">
-                        {errorMsg && (
-                          <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive text-sm">
-                            {errorMsg}
+                          {/* Card footer */}
+                          <div className="px-6 pb-6 space-y-3">
+                            {errorMsg && (
+                              <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive text-sm">
+                                {errorMsg}
+                              </div>
+                            )}
+                            <button
+                              onClick={handleGenerate}
+                              disabled={generateMut.isPending}
+                              className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
+                            >
+                              <Zap className="w-5 h-5 fill-current" /> ⚡ Generate
+                            </button>
+                            <p className="text-center text-xs text-[var(--rz-muted)]">Usually takes 30–45 seconds · Free forever</p>
                           </div>
-                        )}
-                        <button
-                          onClick={handleGenerate}
-                          disabled={generateMut.isPending}
-                          className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
-                        >
-                          <Zap className="w-5 h-5 fill-current" /> ⚡ Generate Package
-                        </button>
-                        <p className="text-center text-xs text-[var(--rz-muted)]">Usually takes 30–45 seconds · Free forever</p>
-                      </div>
-                    </motion.div>
+                        </motion.div>
+
+                        {/* ── RIGHT: Template Selector ── */}
+                        <div className="flex flex-col gap-4">
+                          <div style={{ background: "var(--rz-surface)", border: "1px solid var(--rz-border)", borderRadius: 16, padding: 20 }}>
+                            <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>RESUME TEMPLATE</div>
+
+                            {/* 2x2 template grid */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                              {[
+                                {
+                                  id: "classic" as const,
+                                  name: "Classic",
+                                  desc: "ATS friendly · Formal",
+                                  preview: (
+                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, padding: 8, display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                                      <div style={{ width: "55%", height: 4, background: "#555", borderRadius: 2 }} />
+                                      <div style={{ width: "38%", height: 3, background: "#444", borderRadius: 2 }} />
+                                      <div style={{ width: "70%", height: 1, background: "#333", borderRadius: 1, margin: "3px 0" }} />
+                                      <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      <div style={{ width: "88%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      <div style={{ width: "82%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                    </div>
+                                  ),
+                                },
+                                {
+                                  id: "modern" as const,
+                                  name: "Modern",
+                                  desc: "Bold header · Clean",
+                                  preview: (
+                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                                      <div style={{ height: 14, background: "#2563eb", flexShrink: 0 }} />
+                                      <div style={{ flex: 1, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
+                                        <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "75%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "70%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "80%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      </div>
+                                    </div>
+                                  ),
+                                },
+                                {
+                                  id: "compact" as const,
+                                  name: "Compact",
+                                  desc: "Dense · Max content",
+                                  preview: (
+                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+                                      {Array.from({ length: 14 }).map((_, i) => (
+                                        <div key={i} style={{ width: `${75 + (i % 4) * 5}%`, height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      ))}
+                                    </div>
+                                  ),
+                                },
+                                {
+                                  id: "executive" as const,
+                                  name: "Executive",
+                                  desc: "Two-column · Senior",
+                                  preview: (
+                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, padding: 6, display: "flex", gap: 5 }}>
+                                      <div style={{ width: "32%", background: "#1e1e1e", borderRadius: 4, padding: "4px 5px", display: "flex", flexDirection: "column", gap: 3 }}>
+                                        <div style={{ width: "80%", height: 2, background: "#444", borderRadius: 1 }} />
+                                        <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "70%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      </div>
+                                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                                        <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "75%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "70%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "80%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                        <div style={{ width: "65%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      </div>
+                                    </div>
+                                  ),
+                                },
+                              ].map(t => (
+                                <button
+                                  key={t.id}
+                                  onClick={() => setSelectedTemplate(t.id)}
+                                  style={{
+                                    background: selectedTemplate === t.id ? "#0d1a2e" : "#1e1e1e",
+                                    border: `1px solid ${selectedTemplate === t.id ? "#2563eb" : "#333333"}`,
+                                    borderRadius: 8,
+                                    padding: 10,
+                                    cursor: "pointer",
+                                    textAlign: "left",
+                                    transition: "all 0.15s ease",
+                                  }}
+                                >
+                                  {t.preview}
+                                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 600, color: "#ffffff" }}>{t.name}</div>
+                                  <div style={{ fontSize: 9, color: "#666666" }}>{t.desc}</div>
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Selected info */}
+                            <div style={{ fontSize: 10, color: "#888888" }}>
+                              Selected: {selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)} —{" "}
+                              {selectedTemplate === "classic" ? "ATS friendly · Formal" :
+                               selectedTemplate === "modern"  ? "Bold header · Clean" :
+                               selectedTemplate === "compact" ? "Dense · Max content" :
+                                                                "Two-column · Senior"}
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>{/* end builder grid */}
+                    </div>
                   )}{/* end input/generating card */}
-                </div>
+
               </div>
             </motion.div>
           )}
