@@ -252,6 +252,7 @@ async function generateResumeAndATS(
   isLinkedIn: boolean,
   isScratch: boolean,
   additionalExperience?: string,
+  template?: string,
 ): Promise<{
   latex: string;
   atsOriginal: AtsScore;
@@ -320,6 +321,15 @@ async function generateResumeAndATS(
     "• Preserve original date formats and location names",
     "• Do NOT localize or Americanize content unless the JD specifically requires it",
     "• Preserve the overall resume structure and section ordering from the original resume",
+    "",
+    "━━━ TEMPLATE STYLE ━━━",
+    template === "modern"
+      ? "• Modern template: add a bold colored header bar spanning full width at top. Name in large bold white text, contact info in smaller white text, all on a #2563eb blue background. Use \\colorbox or a colored box for the header."
+      : template === "compact"
+      ? "• Compact template: maximize content density. Use \\setlength{\\itemsep}{0pt}, \\setlength{\\parsep}{0pt}, 10pt base font, tighter margins (0.5in). Fit as much content as possible on 1 page."
+      : template === "executive"
+      ? "• Executive template: use a two-column layout with a narrow left sidebar (~0.28\\linewidth). Left sidebar has a slightly darker background with contact info, skills, and education. Right column has summary and work experience. Use minipage or columnar layout."
+      : "• Classic template: centered header with name (large bold) and contact info, clean horizontal rules between sections, standard single-column ATS-friendly layout.",
     "",
     "━━━ LATEX REQUIREMENTS ━━━",
     String.raw`• Fully compilable with pdflatex: \documentclass through \end{document}`,
@@ -498,9 +508,10 @@ async function processJD(
   isLinkedIn: boolean,
   isScratch: boolean,
   additionalExperience?: string,
+  template?: string,
 ): Promise<JobResult> {
   const [rr, cr] = await Promise.all([
-    generateResumeAndATS(jd, resumeText, resumeB64, isLinkedIn, isScratch, additionalExperience),
+    generateResumeAndATS(jd, resumeText, resumeB64, isLinkedIn, isScratch, additionalExperience, template),
     generateEmailAndCover(jd, resumeText, resumeB64, tone, isLinkedIn, additionalExperience),
   ]);
   return {
@@ -519,6 +530,7 @@ router.post(
     const mode = (req.body.mode as string) || "upload";
     const tone = (req.body.tone as string) || "formal";
     const extra = ((req.body.extra as string) || "").trim();
+    const template = ((req.body.template as string) || "classic").trim();
 
     let jds: JobDescription[] = [];
     try {
@@ -583,7 +595,7 @@ router.post(
       const [jdResults, linkedin] = await Promise.all([
         Promise.all(
           jds.map((jd, i) =>
-            processJD(jd, i, resumeText, resumeB64, tone, isLinkedIn, isScratch, additionalExperience),
+            processJD(jd, i, resumeText, resumeB64, tone, isLinkedIn, isScratch, additionalExperience, template),
           ),
         ),
         generateLinkedIn(jds[0] || null, resumeText, resumeB64, isLinkedIn, additionalExperience),

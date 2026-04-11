@@ -11,6 +11,7 @@ interface GenerateParams {
   linkedinFile?: File | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   linkedinProfile?: Record<string, any> | null;
+  template?: string;
 }
 
 export function useGenerateResume() {
@@ -18,6 +19,9 @@ export function useGenerateResume() {
     mutationFn: async (params: GenerateParams) => {
       const formData = new FormData();
       formData.append("mode", params.mode);
+      if (params.template) {
+        formData.append("template", params.template);
+      }
       formData.append("tone", params.tone);
       
       // Clean JDs for API
