@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Code2, Pencil, Loader2, Check, X, RefreshCw } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import type { ResumeData, ResumeExperience, ResumeEducation, ResumePersonalInfo } from "@/types";
+import { buildLatexFromData } from "@/utils/buildLatexFromData";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,101 +16,12 @@ export interface ResumeEditorProps {
   initialData?: ResumeData | null;
   jd?: { title?: string; company?: string; text?: string };
   onSave: (updatedLatex: string) => Promise<{ success: boolean; error?: string }>;
+  onDataChange?: (data: ResumeData) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_URL = import.meta.env.BASE_URL || "/";
-
-// ─── LaTeX builder (no Claude needed) ────────────────────────────────────────
-
-function escTex(s: string): string {
-  return (s ?? "")
-    .replace(/\\/g, "\\textbackslash{}")
-    .replace(/&/g, "\\&")
-    .replace(/%/g, "\\%")
-    .replace(/\$/g, "\\$")
-    .replace(/#/g, "\\#")
-    .replace(/_/g, "\\_")
-    .replace(/\^/g, "\\^{}")
-    .replace(/\{/g, "\\{")
-    .replace(/\}/g, "\\}")
-    .replace(/~/g, "\\textasciitilde{}")
-    .replace(/</g, "\\textless{}")
-    .replace(/>/g, "\\textgreater{}");
-}
-
-function buildLatexFromData(d: VisualResumeData): string {
-  const pi = d.personalInfo;
-
-  // Header contact line — only include non-empty fields
-  const contactParts = [pi.location, pi.email, pi.phone, pi.linkedin]
-    .filter(Boolean)
-    .map(escTex)
-    .join(" $\\bullet$ ");
-
-  const experienceSection = d.experience.length === 0 ? "" : `
-\\section*{Work Experience}
-\\vspace{-4pt}
-${d.experience.map((exp, idx) => {
-  const bullets = exp.bullets.filter(Boolean);
-  const pageBreak = exp.pageBreakBefore && idx > 0 ? "\\newpage\n" : "";
-  return `${pageBreak}\\noindent\\textbf{${escTex(exp.title)}} \\hfill ${escTex(exp.startDate)}${exp.endDate ? ` -- ${escTex(exp.endDate)}` : ""}\\\\
-\\textit{${escTex(exp.company)}${exp.location ? `, ${escTex(exp.location)}` : ""}}
-${bullets.length > 0 ? `\\begin{itemize}[nosep,leftmargin=*,topsep=2pt,partopsep=0pt]
-${bullets.map(b => `  \\item ${escTex(b)}`).join("\n")}
-\\end{itemize}` : ""}`;
-}).join("\n\\vspace{6pt}\n")}`;
-
-  const educationSection = d.education.length === 0 ? "" : `
-\\section*{Education}
-\\vspace{-4pt}
-${d.education.map(edu => `\\noindent\\textbf{${escTex(edu.degree)}} \\hfill ${escTex(edu.year)}\\\\
-${escTex(edu.institution)}`).join("\n\\vspace{4pt}\n")}`;
-
-  const skillsSection = d.skills.filter(Boolean).length === 0 ? "" : `
-\\section*{Skills}
-${escTex(d.skills.filter(Boolean).join(", "))}`;
-
-  const certsSection = d.certifications.filter(Boolean).length === 0 ? "" : `
-\\section*{Certifications}
-\\begin{itemize}[nosep,leftmargin=*]
-${d.certifications.filter(Boolean).map(c => `  \\item ${escTex(c)}`).join("\n")}
-\\end{itemize}`;
-
-  const summarySection = d.summary.trim() ? `
-\\section*{Professional Summary}
-${escTex(d.summary)}` : "";
-
-  return `\\documentclass[11pt,a4paper]{article}
-\\usepackage[top=0.65in,bottom=0.65in,left=0.65in,right=0.65in]{geometry}
-\\usepackage[hidelinks]{hyperref}
-\\usepackage{enumitem}
-\\usepackage[T1]{fontenc}
-\\usepackage{helvet}
-\\renewcommand{\\familydefault}{\\sfdefault}
-\\pagestyle{empty}
-\\setlength{\\parindent}{0pt}
-\\setlength{\\parskip}{0pt}
-
-\\begin{document}
-
-\\begin{center}
-{\\Large \\textbf{${escTex(pi.name)}}}\\\\[4pt]
-{\\small ${contactParts}}
-\\end{center}
-
-\\vspace{2pt}
-\\hrule
-\\vspace{4pt}
-${summarySection}
-${experienceSection}
-${educationSection}
-${skillsSection}
-${certsSection}
-
-\\end{document}`.replace(/\n{3,}/g, "\n\n");
-}
 
 const EMPTY_DATA: VisualResumeData = {
   personalInfo: { name: "", email: "", phone: "", location: "", linkedin: "" },
@@ -224,7 +136,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
 type ParseStatus = "idle" | "loading" | "done" | "error";
 type UpdateStatus = "idle" | "updating" | "success" | "error";
 
-export function ResumeEditor({ latex, initialData, jd, onSave }: ResumeEditorProps) {
+export function ResumeEditor({ latex, initialData, jd, onSave, onDataChange }: ResumeEditorProps) {
   const [mode, setMode] = useState<"visual" | "latex">("visual");
   const [data, setData] = useState<VisualResumeData>(EMPTY_DATA);
   const [rawLatex, setRawLatex] = useState(latex);
@@ -269,6 +181,18 @@ export function ResumeEditor({ latex, initialData, jd, onSave }: ResumeEditorPro
     setParseStatus("done");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData]);
+
+  // ── Sync edits back to parent (fixes stale-data-on-remount bug) ──────────
+  // Fires whenever data changes after parsing is complete. Parent stores the
+  // latest ResumeData so re-mounting the editor (switching tabs, going to preview
+  // and back) always shows the user's last edited version, not the original.
+  useEffect(() => {
+    if (parseStatus !== "done") return;
+    onDataChange?.(data);
+  // onDataChange is a stable callback ref from the parent — intentionally omitted
+  // from deps to avoid infinite loops if parent recreates the function on each render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, parseStatus]);
 
   // ── Undo / Redo ──────────────────────────────────────────────────────────
   const [editHistory, setEditHistory] = useState<VisualResumeData[]>([]);
