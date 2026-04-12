@@ -215,20 +215,48 @@ function makeContent(
   return parts;
 }
 
+const RETRY_WAIT_MS = 15_000;
+const MAX_RETRIES   = 3;
+
 async function callClaude(
   system: string,
   content: ContentBlock[],
   maxTokens: number,
 ): Promise<string> {
-  const msg = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: maxTokens,
-    system,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    messages: [{ role: "user", content: content as any }],
-  });
-  const block = msg.content[0];
-  return block.type === "text" ? block.text : "";
+  let lastErr: unknown;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const msg = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: maxTokens,
+        system,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        messages: [{ role: "user", content: content as any }],
+      });
+      const block = msg.content[0];
+      return block.type === "text" ? block.text : "";
+    } catch (err: unknown) {
+      lastErr = err;
+
+      // 429 rate-limit — wait then retry
+      const status = (err as { status?: number })?.status;
+      if (status === 429 && attempt < MAX_RETRIES) {
+        const waitMs = attempt * RETRY_WAIT_MS;   // 15 s, 30 s
+        console.warn(
+          `[callClaude] Rate limit hit — attempt ${attempt}/${MAX_RETRIES}. ` +
+          `Waiting ${waitMs / 1000}s before retry...`,
+        );
+        await new Promise<void>(resolve => setTimeout(resolve, waitMs));
+        continue;
+      }
+
+      // Any other error — fail immediately
+      throw err;
+    }
+  }
+
+  throw lastErr ?? new Error("Claude API: max retries exceeded");
 }
 
 function extractTag(text: string, tag: string): string {
