@@ -466,9 +466,22 @@ export default function Home() {
     setTimeout(() => sendAgentMessage(instruction), 80);
   };
 
-  // Auto-compile all JDs when result arrives
+  // Auto-compile all JDs when result arrives.
+  // IMPORTANT: result also changes on every user edit (onDataChange updates resumeData).
+  // We must only do the full reset/compile when the LATEX changed (new generation or
+  // history load) — NOT when only resumeData changed. We detect this with a ref that
+  // tracks the combined latex fingerprint of the current result.
+  const resultLatexKeyRef = useRef<string>("");
   useEffect(() => {
-    if (!result) return;
+    if (!result) { resultLatexKeyRef.current = ""; return; }
+
+    // Build a key from the raw latex of every job. onDataChange only updates
+    // resumeData, never latex, so this key stays stable during editing.
+    const newKey = result.results.map(r => r.latex ?? "").join("\n---\n");
+    if (newKey === resultLatexKeyRef.current) return; // resumeData-only update — skip
+    resultLatexKeyRef.current = newKey;
+
+    // Full setup — only reached on new generation or history load
     setPreviewBlobs({});
     setPreviewLoading({});
     const latexMap: Record<number, string> = {};
