@@ -11,13 +11,14 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { cn, copyToClipboard, generateOverleafUrl } from "@/lib/utils";
-import type { Mode, JD, ScratchData, GenerateResponse, AtsScore } from "@/types";
+import type { Mode, JD, ScratchData, GenerateResponse, AtsScore, ResumeData } from "@/types";
 import { useGenerateResume } from "@/hooks/use-generate";
 import { useHistory } from "@/hooks/use-history";
 
 import { Dropzone } from "@/components/inputs/Dropzone";
 import { PdfPreview } from "@/components/ui/PdfPreview";
 import { ResumeEditor } from "@/components/ui/ResumeEditor";
+import { buildLatexFromData } from "@/utils/buildLatexFromData";
 
 // -- RezAI Agent quick-action chips --
 const AGENT_CHIPS_ROW1 = ["Add missing keywords", "Strengthen summary", "Fix weak verbs", "Shorten to 1 page"] as const;
@@ -1686,6 +1687,27 @@ export default function Home() {
                                 latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
                                 initialData={result.results[activeJdTab].resumeData as any ?? null}
                                 jd={jds[activeJdTab]}
+                                onDataChange={(updatedData: ResumeData) => {
+                                  // Keep result state fresh so re-mounting the editor
+                                  // always shows the user's last edited version
+                                  setResult(prev => {
+                                    if (!prev) return prev;
+                                    return {
+                                      ...prev,
+                                      results: {
+                                        ...prev.results,
+                                        [activeJdTab]: {
+                                          ...prev.results[activeJdTab],
+                                          resumeData: updatedData,
+                                        },
+                                      },
+                                    };
+                                  });
+                                  // Also keep editableLatex in sync so Preview/Download
+                                  // always uses the latest edited content
+                                  const latestLatex = buildLatexFromData(updatedData);
+                                  setEditableLatex(prev => ({ ...prev, [activeJdTab]: latestLatex }));
+                                }}
                                 onSave={async (updatedLatex: string) => {
                                   // Fast path: single pdflatex pass, returns base64 JSON
                                   // (no Claude API call — ResumeEditor already built the LaTeX in JS)
