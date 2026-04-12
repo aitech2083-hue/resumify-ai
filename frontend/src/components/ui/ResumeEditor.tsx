@@ -183,14 +183,19 @@ export function ResumeEditor({ latex, initialData, jd, onSave, onDataChange }: R
   }, [initialData]);
 
   // ── Sync edits back to parent (fixes stale-data-on-remount bug) ──────────
-  // Fires whenever data changes after parsing is complete. Parent stores the
-  // latest ResumeData so re-mounting the editor (switching tabs, going to preview
-  // and back) always shows the user's last edited version, not the original.
+  // isUserEdit distinguishes real user edits from programmatic setData calls
+  // (initialData effect, undo/redo). Only user edits should propagate to the
+  // parent — otherwise initialData prop changes → initialData effect → setData
+  // → useEffect → onDataChange → setResult → initialData changes again → ♾️
+  const isUserEdit = useRef(false);
+
   useEffect(() => {
     if (parseStatus !== "done") return;
+    if (!isUserEdit.current) return;
+    isUserEdit.current = false;
     onDataChange?.(data);
-  // onDataChange is a stable callback ref from the parent — intentionally omitted
-  // from deps to avoid infinite loops if parent recreates the function on each render.
+  // onDataChange intentionally omitted — it's a callback prop, adding it would
+  // require the parent to memoize it and still wouldn't prevent the loop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, parseStatus]);
 
@@ -206,8 +211,10 @@ export function ResumeEditor({ latex, initialData, jd, onSave, onDataChange }: R
     setHistoryIndex(newHistory.length - 1);
   };
 
-  /** Wrap all user edits: saves current state to history then applies updater */
+  /** Wrap all user edits: saves current state to history then applies updater.
+   *  Sets isUserEdit so the onDataChange effect knows to propagate to the parent. */
   const updateData = (updater: (prev: VisualResumeData) => VisualResumeData) => {
+    isUserEdit.current = true;
     saveToHistory(data);
     setData(updater);
   };
