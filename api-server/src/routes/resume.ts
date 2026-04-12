@@ -246,6 +246,36 @@ function parseBreakdown(block: string): string {
   return block.replace(/score\s*:\s*\d+/i, "").trim();
 }
 
+/** Fallback: build minimal ResumeData from LaTeX when Claude omits the RESUME_DATA tag */
+function buildResumeDataFromLatex(latex: string): Record<string, unknown> {
+  // Extract name — try common LaTeX header patterns
+  const nameMatch =
+    latex.match(/\\Large\s*\\textbf\{([^}]+)\}/i) ||
+    latex.match(/\\huge\s*\\textbf\{([^}]+)\}/i) ||
+    latex.match(/\{\\Large\s*\\textbf\{([^}]+)\}\}/i) ||
+    latex.match(/\\begin\{center\}[\s\S]*?\\textbf\{([^}]{3,60})\}/i);
+  const rawName = nameMatch ? nameMatch[1] : "";
+  // Strip any remaining LaTeX commands from name
+  const name = rawName.replace(/\\[a-zA-Z]+\{([^}]*)\}/g, "$1").replace(/\\/g, "").trim();
+
+  // Extract email
+  const emailMatch = latex.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  const email = emailMatch ? emailMatch[0] : "";
+
+  // Extract phone — look for digit sequences that look like phone numbers
+  const phoneMatch = latex.match(/(?:\+?\d[\d\s\-().]{8,18}\d)/);
+  const phone = phoneMatch ? phoneMatch[0].trim() : "";
+
+  return {
+    personalInfo: { name, email, phone, location: "", linkedin: "" },
+    summary: "",
+    experience: [],
+    education: [],
+    skills: [],
+    certifications: [],
+  };
+}
+
 async function generateResumeAndATS(
   jd: JobDescription,
   resumeText: string | null,
@@ -286,6 +316,19 @@ async function generateResumeAndATS(
   // FIX 2 & 3: Improved system prompt with deep analysis instructions
   // and explicit handling of additional experience
   const system = [
+    "⚠️ ABSOLUTE REQUIREMENT — READ THIS FIRST:",
+    "You MUST return ALL of the following XML tags in your response, in this exact order:",
+    "<ATS_BEFORE> ... </ATS_BEFORE>",
+    "<LATEX> ... </LATEX>",
+    "<ATS_AFTER> ... </ATS_AFTER>",
+    "<KEYWORDS_MATCHED> ... </KEYWORDS_MATCHED>",
+    "<KEYWORDS_MISSING> ... </KEYWORDS_MISSING>",
+    "<HEALTH_SCORE> ... </HEALTH_SCORE>",
+    "<JOB_FIT> ... </JOB_FIT>",
+    "<RESUME_DATA> ... </RESUME_DATA>",
+    "The <RESUME_DATA> tag is CRITICAL — it must contain a complete, valid JSON object with ALL fields populated.",
+    "NEVER omit <RESUME_DATA>. NEVER return null or empty for personalInfo.name. Extract the candidate's full name from the resume.",
+    "",
     "You are an elite resume writer, ATS expert, and LaTeX developer.",
     "Take your time to carefully read and deeply understand both the resume and the job description before writing anything.",
     "",
@@ -406,7 +449,8 @@ async function generateResumeAndATS(
     missing_keywords: parseKeywords("KEYWORDS_MISSING"),
     healthScore: healthScore ?? null,
     jobFit: jobFit ?? null,
-    resumeData: resumeData ?? null,
+    // Always non-null: use parsed tag or fallback extractor so Edit Resume never calls parse-latex
+    resumeData: resumeData ?? buildResumeDataFromLatex(latex),
   };
 }
 
