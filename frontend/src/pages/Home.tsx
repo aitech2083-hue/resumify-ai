@@ -808,7 +808,7 @@ export default function Home() {
 
                     /* ─── INPUT + TEMPLATE GRID ─── */
                     <div className="w-full" style={{ maxWidth: 1100 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="rz-builder-grid">
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }} className="rz-builder-grid">
                         <style>{`@media (max-width: 768px) { .rz-builder-grid { grid-template-columns: 1fr !important; } }`}</style>
 
                         {/* ── LEFT: Builder card ── */}
@@ -816,6 +816,7 @@ export default function Home() {
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-2xl shadow-2xl overflow-hidden"
+                          style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
                         >
                           {/* Card header */}
                           <div className="px-6 pt-6 pb-4 border-b border-[var(--rz-border)]/60">
@@ -1259,12 +1260,12 @@ export default function Home() {
 
                         {/* ── RIGHT: Template Selector ── */}
                         {/* ── RIGHT: Template Selector ── */}
-                        <div className="flex flex-col gap-4">
-                          <div style={{ background: "var(--rz-surface)", border: "1px solid var(--rz-border)", borderRadius: 16, padding: 20 }}>
+                        <div className="flex flex-col gap-4" style={{ height: '100%' }}>
+                          <div style={{ background: "var(--rz-surface)", border: "1px solid var(--rz-border)", borderRadius: 16, padding: 20, height: '100%', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>RESUME TEMPLATE</div>
 
                             {/* 2×2 template grid */}
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, flex: 1, alignItems: 'stretch' }}>
 
                               {/* ── CLASSIC ── */}
                               {(["classic","modern","compact","executive"] as const).map(tid => {
@@ -1277,7 +1278,7 @@ export default function Home() {
                                 };
                                 const preview =
                                   tid === "classic" ? (
-                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, padding: 8, fontFamily: "Georgia, serif" }}>
+                                    <div style={{ background: "#ffffff", height: '100%', overflow: "hidden", borderRadius: 6, padding: 8, fontFamily: "Georgia, serif" }}>
                                       <div style={{ textAlign: "center", marginBottom: 4 }}>
                                         <div style={{ fontSize: 9, fontWeight: 700, color: "#000000", letterSpacing: "0.05em" }}>ALEX JOHNSON</div>
                                         <div style={{ fontSize: 6, color: "#444444", marginTop: 1 }}>alex@email.com · +91 98765 43210 · Bangalore</div>
@@ -1296,7 +1297,7 @@ export default function Home() {
                                       <div style={{ fontSize: 6, color: "#333333" }}>SQL · Power BI · Python · Agile</div>
                                     </div>
                                   ) : tid === "modern" ? (
-                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, fontFamily: "Arial, sans-serif" }}>
+                                    <div style={{ background: "#ffffff", height: '100%', overflow: "hidden", borderRadius: 6, fontFamily: "Arial, sans-serif" }}>
                                       <div style={{ background: "#2563eb", padding: "7px 8px", marginBottom: 5 }}>
                                         <div style={{ fontSize: 9, fontWeight: 700, color: "#ffffff" }}>Alex Johnson</div>
                                         <div style={{ fontSize: 6, color: "#bfdbfe", marginTop: 1 }}>Senior Business Analyst</div>
@@ -1316,7 +1317,7 @@ export default function Home() {
                                       </div>
                                     </div>
                                   ) : tid === "compact" ? (
-                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, padding: 6, fontFamily: "Arial, sans-serif" }}>
+                                    <div style={{ background: "#ffffff", height: '100%', overflow: "hidden", borderRadius: 6, padding: 6, fontFamily: "Arial, sans-serif" }}>
                                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid #000000", paddingBottom: 2, marginBottom: 3 }}>
                                         <div style={{ fontSize: 8, fontWeight: 700, color: "#000000" }}>ALEX JOHNSON</div>
                                         <div style={{ fontSize: 5.5, color: "#444444" }}>alex@email.com · +91 98765 43210</div>
@@ -1331,7 +1332,7 @@ export default function Home() {
                                       <div style={{ fontSize: 5.5, color: "#333333" }}>SQL · Power BI · Python · Agile · Tableau · JIRA · Excel · Confluence</div>
                                     </div>
                                   ) : (
-                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, fontFamily: "Arial, sans-serif", display: "grid", gridTemplateColumns: "38% 62%" }}>
+                                    <div style={{ background: "#ffffff", height: '100%', overflow: "hidden", borderRadius: 6, fontFamily: "Arial, sans-serif", display: "grid", gridTemplateColumns: "38% 62%" }}>
                                       <div style={{ background: "#1e293b", padding: "8px 6px" }}>
                                         <div style={{ fontSize: 7, fontWeight: 700, color: "#ffffff", marginBottom: 1 }}>Alex Johnson</div>
                                         <div style={{ fontSize: 5.5, color: "#94a3b8", marginBottom: 5 }}>Sr. Business Analyst</div>
@@ -1366,9 +1367,14 @@ export default function Home() {
                                       cursor: "pointer",
                                       textAlign: "left",
                                       transition: "all 0.15s ease",
+                                      height: '100%',
+                                      display: 'flex',
+                                      flexDirection: 'column',
                                     }}
                                   >
-                                    {preview}
+                                    <div style={{ flex: 1, minHeight: 80, overflow: 'hidden', borderRadius: 6 }}>
+                                      {preview}
+                                    </div>
                                     <div style={{ marginTop: 8 }}>
                                       <div style={{ fontSize: 12, fontWeight: 600, color: "#ffffff" }}>{meta[tid].name}</div>
                                       <div style={{ fontSize: 10, color: "#666666", marginTop: 1 }}>{meta[tid].desc}</div>
@@ -1395,7 +1401,7 @@ export default function Home() {
                             </div>
 
                             {/* Selected info bar */}
-                            <div style={{ padding: "8px 12px", background: "#141414", border: "1px solid #262626", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ padding: "8px 12px", background: "#141414", border: "1px solid #262626", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 'auto' }}>
                               <div style={{ fontSize: 11, color: "#888888" }}>
                                 Using: <span style={{ color: "#ffffff", fontWeight: 600 }}>
                                   {selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)}
