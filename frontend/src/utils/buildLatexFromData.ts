@@ -2,20 +2,43 @@ import type { ResumeData } from "@/types";
 
 // ─── LaTeX escape ─────────────────────────────────────────────────────────────
 
+// Null-byte sentinels — survive all LaTeX character escaping untouched
+const BOLD_OPEN   = "\u0000BOLD\u0000";
+const BOLD_CLOSE  = "\u0000ENDBOLD\u0000";
+const ITALIC_OPEN = "\u0000ITALIC\u0000";
+const ITALIC_CLOSE = "\u0000ENDITALIC\u0000";
+
 export function escTex(s: string): string {
-  return (s ?? "")
-    .replace(/\\/g, "\\textbackslash{}")
-    .replace(/&/g, "\\&")
-    .replace(/%/g, "\\%")
-    .replace(/\$/g, "\\$")
-    .replace(/#/g, "\\#")
-    .replace(/_/g, "\\_")
-    .replace(/\^/g, "\\^{}")
-    .replace(/\{/g, "\\{")
-    .replace(/\}/g, "\\}")
-    .replace(/~/g, "\\textasciitilde{}")
-    .replace(/</g, "\\textless{}")
-    .replace(/>/g, "\\textgreater{}");
+  if (!s) return "";
+
+  // ── Step 1: capture markdown BEFORE any LaTeX escaping ───────────────────
+  // Replace **bold** / *italic* with null-byte sentinels so the markers
+  // survive the backslash/brace escaping that follows.
+  let r = s
+    .replace(/\*\*(.+?)\*\*/g, `${BOLD_OPEN}$1${BOLD_CLOSE}`)
+    .replace(/\*(.+?)\*/g,     `${ITALIC_OPEN}$1${ITALIC_CLOSE}`);
+
+  // ── Step 2: standard LaTeX character escaping ─────────────────────────────
+  r = r
+    .replace(/\\/g,  "\\textbackslash{}")
+    .replace(/&/g,   "\\&")
+    .replace(/%/g,   "\\%")
+    .replace(/\$/g,  "\\$")
+    .replace(/#/g,   "\\#")
+    .replace(/_/g,   "\\_")
+    .replace(/\{/g,  "\\{")
+    .replace(/\}/g,  "\\}")
+    .replace(/~/g,   "\\textasciitilde{}")
+    .replace(/\^/g,  "\\textasciicircum{}")
+    .replace(/</g,   "\\textless{}")
+    .replace(/>/g,   "\\textgreater{}");
+
+  // ── Step 3: restore sentinels as proper LaTeX commands ───────────────────
+  r = r
+    .replace(new RegExp(`${BOLD_OPEN}(.+?)${BOLD_CLOSE}`, "g"),     "\\textbf{$1}")
+    .replace(new RegExp(`${ITALIC_OPEN}(.+?)${ITALIC_CLOSE}`, "g"), "\\textit{$1}");
+
+  return r;
 }
 
 // ─── Pure JS LaTeX builder — no API needed ────────────────────────────────────
