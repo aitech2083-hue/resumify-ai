@@ -1201,109 +1201,147 @@ export default function Home() {
                         </motion.div>
 
                         {/* ── RIGHT: Template Selector ── */}
+                        {/* ── RIGHT: Template Selector ── */}
                         <div className="flex flex-col gap-4">
                           <div style={{ background: "var(--rz-surface)", border: "1px solid var(--rz-border)", borderRadius: 16, padding: 20 }}>
-                            <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>RESUME TEMPLATE</div>
+                            <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>RESUME TEMPLATE</div>
 
-                            {/* 2x2 template grid */}
+                            {/* 2×2 template grid */}
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-                              {[
-                                {
-                                  id: "classic" as const,
-                                  name: "Classic",
-                                  desc: "ATS friendly · Formal",
-                                  preview: (
-                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, padding: 8, display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
-                                      <div style={{ width: "55%", height: 4, background: "#555", borderRadius: 2 }} />
-                                      <div style={{ width: "38%", height: 3, background: "#444", borderRadius: 2 }} />
-                                      <div style={{ width: "70%", height: 1, background: "#333", borderRadius: 1, margin: "3px 0" }} />
-                                      <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                      <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                      <div style={{ width: "88%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                      <div style={{ width: "82%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+
+                              {/* ── CLASSIC ── */}
+                              {(["classic","modern","compact","executive"] as const).map(tid => {
+                                const sel = selectedTemplate === tid;
+                                const meta: Record<string, { name: string; desc: string }> = {
+                                  classic:   { name: "Classic",   desc: "Corporate · ATS safe · Serif" },
+                                  modern:    { name: "Modern",    desc: "Tech · Startup · Clean" },
+                                  compact:   { name: "Compact",   desc: "Dense · Senior · 1-page" },
+                                  executive: { name: "Executive", desc: "Two column · Leadership" },
+                                };
+                                const preview =
+                                  tid === "classic" ? (
+                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, padding: 8, fontFamily: "Georgia, serif" }}>
+                                      <div style={{ textAlign: "center", marginBottom: 4 }}>
+                                        <div style={{ fontSize: 9, fontWeight: 700, color: "#000000", letterSpacing: "0.05em" }}>ALEX JOHNSON</div>
+                                        <div style={{ fontSize: 6, color: "#444444", marginTop: 1 }}>alex@email.com · +91 98765 43210 · Bangalore</div>
+                                      </div>
+                                      <div style={{ borderTop: "1px solid #000000", marginBottom: 4 }} />
+                                      <div style={{ fontSize: 7, fontWeight: 700, color: "#000000", letterSpacing: "0.08em", marginBottom: 2 }}>EXPERIENCE</div>
+                                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                        <div style={{ fontSize: 6.5, fontWeight: 700, color: "#000000" }}>Senior Business Analyst</div>
+                                        <div style={{ fontSize: 6, color: "#444444" }}>2021 – Present</div>
+                                      </div>
+                                      <div style={{ fontSize: 6, color: "#444444", fontStyle: "italic", marginBottom: 2 }}>Infosys Ltd, Bangalore</div>
+                                      <div style={{ fontSize: 6, color: "#333333", marginLeft: 6 }}>• Built Power BI dashboards for ops</div>
+                                      <div style={{ fontSize: 6, color: "#333333", marginLeft: 6, marginBottom: 3 }}>• Authored SQL queries for 100M+ rows</div>
+                                      <div style={{ borderTop: "1px solid #000000", marginBottom: 2 }} />
+                                      <div style={{ fontSize: 7, fontWeight: 700, color: "#000000", letterSpacing: "0.08em", marginBottom: 2 }}>SKILLS</div>
+                                      <div style={{ fontSize: 6, color: "#333333" }}>SQL · Power BI · Python · Agile</div>
                                     </div>
-                                  ),
-                                },
-                                {
-                                  id: "modern" as const,
-                                  name: "Modern",
-                                  desc: "Bold header · Clean",
-                                  preview: (
-                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                                      <div style={{ height: 14, background: "#2563eb", flexShrink: 0 }} />
-                                      <div style={{ flex: 1, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
-                                        <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "75%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "70%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "80%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                  ) : tid === "modern" ? (
+                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, fontFamily: "Arial, sans-serif" }}>
+                                      <div style={{ background: "#2563eb", padding: "7px 8px", marginBottom: 5 }}>
+                                        <div style={{ fontSize: 9, fontWeight: 700, color: "#ffffff" }}>Alex Johnson</div>
+                                        <div style={{ fontSize: 6, color: "#bfdbfe", marginTop: 1 }}>Senior Business Analyst</div>
+                                        <div style={{ fontSize: 5.5, color: "#93c5fd", marginTop: 1 }}>alex@email.com · Bangalore, India</div>
+                                      </div>
+                                      <div style={{ padding: "0 8px" }}>
+                                        <div style={{ fontSize: 7, fontWeight: 700, color: "#2563eb", borderBottom: "1px solid #2563eb", paddingBottom: 1, marginBottom: 3, letterSpacing: "0.06em" }}>EXPERIENCE</div>
+                                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 1 }}>
+                                          <div style={{ fontSize: 6.5, fontWeight: 700, color: "#111827" }}>Senior Business Analyst</div>
+                                          <div style={{ fontSize: 6, color: "#6b7280" }}>2021 – Present</div>
+                                        </div>
+                                        <div style={{ fontSize: 6, color: "#6b7280", marginBottom: 2 }}>Infosys Ltd, Bangalore</div>
+                                        <div style={{ fontSize: 6, color: "#374151", marginLeft: 6 }}>• Built Power BI dashboards for ops</div>
+                                        <div style={{ fontSize: 6, color: "#374151", marginLeft: 6, marginBottom: 3 }}>• Authored SQL for 100M+ row datasets</div>
+                                        <div style={{ fontSize: 7, fontWeight: 700, color: "#2563eb", borderBottom: "1px solid #2563eb", paddingBottom: 1, marginBottom: 2, letterSpacing: "0.06em" }}>SKILLS</div>
+                                        <div style={{ fontSize: 6, color: "#374151" }}>SQL · Power BI · Python · Agile</div>
                                       </div>
                                     </div>
-                                  ),
-                                },
-                                {
-                                  id: "compact" as const,
-                                  name: "Compact",
-                                  desc: "Dense · Max content",
-                                  preview: (
-                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
-                                      {Array.from({ length: 14 }).map((_, i) => (
-                                        <div key={i} style={{ width: `${75 + (i % 4) * 5}%`, height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                      ))}
-                                    </div>
-                                  ),
-                                },
-                                {
-                                  id: "executive" as const,
-                                  name: "Executive",
-                                  desc: "Two-column · Senior",
-                                  preview: (
-                                    <div style={{ height: 70, background: "#262626", borderRadius: 6, padding: 6, display: "flex", gap: 5 }}>
-                                      <div style={{ width: "32%", background: "#1e1e1e", borderRadius: 4, padding: "4px 5px", display: "flex", flexDirection: "column", gap: 3 }}>
-                                        <div style={{ width: "80%", height: 2, background: "#444", borderRadius: 1 }} />
-                                        <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "70%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                  ) : tid === "compact" ? (
+                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, padding: 6, fontFamily: "Arial, sans-serif" }}>
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "1px solid #000000", paddingBottom: 2, marginBottom: 3 }}>
+                                        <div style={{ fontSize: 8, fontWeight: 700, color: "#000000" }}>ALEX JOHNSON</div>
+                                        <div style={{ fontSize: 5.5, color: "#444444" }}>alex@email.com · +91 98765 43210</div>
                                       </div>
-                                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-                                        <div style={{ width: "90%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "75%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "85%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "70%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "80%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
-                                        <div style={{ width: "65%", height: 2, background: "#3a3a3a", borderRadius: 1 }} />
+                                      <div style={{ fontSize: 6.5, fontWeight: 700, color: "#000000", letterSpacing: "0.06em", marginBottom: 1 }}>EXPERIENCE</div>
+                                      <div style={{ fontSize: 6, fontWeight: 700, color: "#000000" }}>Senior Business Analyst, Infosys Ltd <span style={{ fontWeight: 400, color: "#555555" }}>· 2021–Present</span></div>
+                                      <div style={{ fontSize: 5.5, color: "#333333", marginLeft: 5, lineHeight: 1.4 }}>• Built Power BI dashboards reducing report time by 40%</div>
+                                      <div style={{ fontSize: 5.5, color: "#333333", marginLeft: 5, lineHeight: 1.4, marginBottom: 2 }}>• Authored SQL queries on 100M+ rows</div>
+                                      <div style={{ fontSize: 6, fontWeight: 700, color: "#000000", letterSpacing: "0.06em", marginBottom: 1 }}>EDUCATION</div>
+                                      <div style={{ fontSize: 5.5, color: "#333333", marginBottom: 2 }}>MBA — IIM Bangalore, 2021</div>
+                                      <div style={{ fontSize: 6.5, fontWeight: 700, color: "#000000", letterSpacing: "0.06em", marginBottom: 1 }}>SKILLS</div>
+                                      <div style={{ fontSize: 5.5, color: "#333333" }}>SQL · Power BI · Python · Agile · Tableau · JIRA · Excel · Confluence</div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ background: "#ffffff", height: 140, overflow: "hidden", borderRadius: 6, fontFamily: "Arial, sans-serif", display: "grid", gridTemplateColumns: "38% 62%" }}>
+                                      <div style={{ background: "#1e293b", padding: "8px 6px" }}>
+                                        <div style={{ fontSize: 7, fontWeight: 700, color: "#ffffff", marginBottom: 1 }}>Alex Johnson</div>
+                                        <div style={{ fontSize: 5.5, color: "#94a3b8", marginBottom: 5 }}>Sr. Business Analyst</div>
+                                        <div style={{ fontSize: 6, fontWeight: 700, color: "#60a5fa", letterSpacing: "0.06em", marginBottom: 2 }}>CONTACT</div>
+                                        <div style={{ fontSize: 5.5, color: "#cbd5e1", marginBottom: 4, lineHeight: 1.5 }}>alex@email.com<br/>+91 98765 43210<br/>Bangalore, India</div>
+                                        <div style={{ fontSize: 6, fontWeight: 700, color: "#60a5fa", letterSpacing: "0.06em", marginBottom: 2 }}>SKILLS</div>
+                                        <div style={{ fontSize: 5.5, color: "#cbd5e1", lineHeight: 1.6 }}>SQL<br/>Power BI<br/>Python<br/>Agile<br/>Tableau</div>
+                                      </div>
+                                      <div style={{ padding: "8px 6px" }}>
+                                        <div style={{ fontSize: 6.5, fontWeight: 700, color: "#1e293b", letterSpacing: "0.06em", borderBottom: "1px solid #e2e8f0", paddingBottom: 1, marginBottom: 3 }}>EXPERIENCE</div>
+                                        <div style={{ fontSize: 6.5, fontWeight: 700, color: "#111827" }}>Senior Business Analyst</div>
+                                        <div style={{ fontSize: 5.5, color: "#6b7280", marginBottom: 1 }}>Infosys Ltd · 2021 – Present</div>
+                                        <div style={{ fontSize: 5.5, color: "#374151", marginLeft: 5, lineHeight: 1.4 }}>• Built Power BI dashboards</div>
+                                        <div style={{ fontSize: 5.5, color: "#374151", marginLeft: 5, lineHeight: 1.4, marginBottom: 3 }}>• SQL queries on 100M+ rows</div>
+                                        <div style={{ fontSize: 6.5, fontWeight: 700, color: "#1e293b", letterSpacing: "0.06em", borderBottom: "1px solid #e2e8f0", paddingBottom: 1, marginBottom: 2 }}>EDUCATION</div>
+                                        <div style={{ fontSize: 5.5, color: "#374151" }}>MBA — IIM Bangalore, 2021</div>
                                       </div>
                                     </div>
-                                  ),
-                                },
-                              ].map(t => (
-                                <button
-                                  key={t.id}
-                                  onClick={() => setSelectedTemplate(t.id)}
-                                  style={{
-                                    background: selectedTemplate === t.id ? "#0d1a2e" : "#1e1e1e",
-                                    border: `1px solid ${selectedTemplate === t.id ? "#2563eb" : "#333333"}`,
-                                    borderRadius: 8,
-                                    padding: 10,
-                                    cursor: "pointer",
-                                    textAlign: "left",
-                                    transition: "all 0.15s ease",
-                                  }}
-                                >
-                                  {t.preview}
-                                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 600, color: "#ffffff" }}>{t.name}</div>
-                                  <div style={{ fontSize: 9, color: "#666666" }}>{t.desc}</div>
-                                </button>
-                              ))}
+                                  );
+
+                                return (
+                                  <button
+                                    key={tid}
+                                    onClick={() => setSelectedTemplate(tid)}
+                                    onMouseEnter={e => { if (!sel) { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(37,99,235,0.5)"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.01)"; } }}
+                                    onMouseLeave={e => { if (!sel) { (e.currentTarget as HTMLButtonElement).style.borderColor = "#333333"; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; } }}
+                                    style={{
+                                      background: sel ? "#0d1a2e" : "#1e1e1e",
+                                      border: sel ? "2px solid #2563eb" : "1px solid #333333",
+                                      borderRadius: 10,
+                                      padding: 10,
+                                      cursor: "pointer",
+                                      textAlign: "left",
+                                      transition: "all 0.15s ease",
+                                    }}
+                                  >
+                                    {preview}
+                                    <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                      <div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: "#ffffff" }}>{meta[tid].name}</div>
+                                        <div style={{ fontSize: 10, color: "#666666", marginTop: 1 }}>{meta[tid].desc}</div>
+                                      </div>
+                                      {sel && (
+                                        <div style={{ background: "#2563eb", color: "#ffffff", borderRadius: 5, padding: "2px 8px", fontSize: 10, fontWeight: 600, flexShrink: 0 }}>
+                                          Selected
+                                        </div>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+
                             </div>
 
-                            {/* Selected info */}
-                            <div style={{ fontSize: 10, color: "#888888" }}>
-                              Selected: {selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)} —{" "}
-                              {selectedTemplate === "classic" ? "ATS friendly · Formal" :
-                               selectedTemplate === "modern"  ? "Bold header · Clean" :
-                               selectedTemplate === "compact" ? "Dense · Max content" :
-                                                                "Two-column · Senior"}
+                            {/* Selected info bar */}
+                            <div style={{ padding: "8px 12px", background: "#141414", border: "1px solid #262626", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div style={{ fontSize: 11, color: "#888888" }}>
+                                Using: <span style={{ color: "#ffffff", fontWeight: 600 }}>
+                                  {selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)}
+                                </span> template
+                              </div>
+                              <div style={{ fontSize: 10, color: "#666666" }}>
+                                {selectedTemplate === "classic" ? "ATS friendly · Formal" :
+                                 selectedTemplate === "modern"  ? "Tech · Startup · Clean" :
+                                 selectedTemplate === "compact" ? "Dense · Senior · 1-page" :
+                                                                  "Two column · Leadership"}
+                              </div>
                             </div>
                           </div>
                         </div>
