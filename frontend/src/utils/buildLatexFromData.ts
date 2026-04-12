@@ -28,18 +28,38 @@ export function buildLatexFromData(d: ResumeData): string {
     .map(escTex)
     .join(" $\\bullet$ ");
 
+  // Build each experience entry as { content, hasPageBreak } so the joiner
+  // can decide whether to add \vspace{6pt} between entries.
+  // Rule: skip \vspace{6pt} after an entry when the NEXT entry has pageBreakBefore —
+  // otherwise the \vspace{6pt} lands on the first page just before \newpage (wrong).
+  const experienceParts = d.experience.map((exp, idx) => {
+    const bullets = exp.bullets.filter(Boolean);
+    const pageBreak = exp.pageBreakBefore && idx > 0 ? "\\newpage\n" : "";
+    const bulletBlock = bullets.length > 0
+      ? `\\begin{itemize}[nosep,leftmargin=*,topsep=2pt,partopsep=0pt]\n${bullets.map(b => `  \\item ${escTex(b)}`).join("\n")}\n\\end{itemize}`
+      : "";
+    return {
+      content: `${pageBreak}\\noindent\\textbf{${escTex(exp.title)}} \\hfill ${escTex(exp.startDate)}${exp.endDate ? ` -- ${escTex(exp.endDate)}` : ""}\\\\
+\\textit{${escTex(exp.company)}${exp.location ? `, ${escTex(exp.location)}` : ""}}
+${bulletBlock}`,
+      hasPageBreak: !!(exp.pageBreakBefore && idx > 0),
+    };
+  });
+
+  const experienceJoined = experienceParts
+    .map((part, idx) => {
+      const isLast = idx === experienceParts.length - 1;
+      const nextHasPageBreak = experienceParts[idx + 1]?.hasPageBreak === true;
+      // No trailing \vspace when: this is the last entry, or next entry starts a new page
+      if (isLast || nextHasPageBreak) return part.content;
+      return part.content + "\n\\vspace{6pt}";
+    })
+    .join("\n");
+
   const experienceSection = d.experience.length === 0 ? "" : `
 \\section*{Work Experience}
 \\vspace{-4pt}
-${d.experience.map((exp, idx) => {
-  const bullets = exp.bullets.filter(Boolean);
-  const pageBreak = exp.pageBreakBefore && idx > 0 ? "\\newpage\n" : "";
-  return `${pageBreak}\\noindent\\textbf{${escTex(exp.title)}} \\hfill ${escTex(exp.startDate)}${exp.endDate ? ` -- ${escTex(exp.endDate)}` : ""}\\\\
-\\textit{${escTex(exp.company)}${exp.location ? `, ${escTex(exp.location)}` : ""}}
-${bullets.length > 0 ? `\\begin{itemize}[nosep,leftmargin=*,topsep=2pt,partopsep=0pt]
-${bullets.map(b => `  \\item ${escTex(b)}`).join("\n")}
-\\end{itemize}` : ""}`;
-}).join("\n\\vspace{6pt}\n")}`;
+${experienceJoined}`;
 
   const educationSection = d.education.length === 0 ? "" : `
 \\section*{Education}
