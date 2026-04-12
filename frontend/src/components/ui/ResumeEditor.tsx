@@ -622,16 +622,18 @@ export function ResumeEditor({ latex, initialData, jd, onSave, onDataChange }: R
             )}
             {data.experience.map((exp, expIdx) => (
               <div key={exp.id}>
-                {/* Page break indicator — click to remove */}
+                {/* Page break indicator — above the card that has pageBreakBefore */}
                 {exp.pageBreakBefore && expIdx > 0 && (
                   <div
                     onClick={() => updateData(d => ({ ...d, experience: d.experience.map(e => e.id === exp.id ? { ...e, pageBreakBefore: false } : e) }))}
-                    style={{ borderTop: '2px dashed #333333', margin: '8px 0 4px 0', position: 'relative', cursor: 'pointer' }}
                     title="Click to remove page break"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0', cursor: 'pointer' }}
                   >
-                    <span style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: '#0a0a0a', padding: '0 8px', fontSize: '9px', color: '#444444', whiteSpace: 'nowrap' }}>
-                      ↑ Page Break — click to remove
+                    <div style={{ flex: 1, borderTop: '2px dashed #333333' }} />
+                    <span style={{ fontSize: '10px', color: '#555555', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                      Page Break · click to remove
                     </span>
+                    <div style={{ flex: 1, borderTop: '2px dashed #333333' }} />
                   </div>
                 )}
               <div style={{ background: "#0a0a0a", border: "1px solid #262626", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
