@@ -107,6 +107,7 @@ interface JobResult {
   coverLetter: string;
   healthScore: HealthScore | null;
   jobFit: JobFit | null;
+  resumeData: Record<string, unknown> | null;
 }
 
 interface LinkedInContent {
@@ -259,6 +260,9 @@ async function generateResumeAndATS(
   atsTailored: AtsScore;
   matched_keywords: string[];
   missing_keywords: string[];
+  healthScore: HealthScore | null;
+  jobFit: JobFit | null;
+  resumeData: Record<string, unknown> | null;
 }> {
   const preambleExample = [
     String.raw`\documentclass[11pt]{article}`,
@@ -365,6 +369,9 @@ async function generateResumeAndATS(
     "<JOB_FIT>",
     `{"grade":"[A+/A/B+/B/C+/C]","score":[1.0-5.0],"verdict":"[one-line verdict]","shouldApply":[true/false],"dimensions":[{"name":"Role Match","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Skills Match","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Seniority Fit","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Salary Range","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Work Mode","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Interview Probability","score":[0-100],"label":"[High/Moderate/Low]"}],"gaps":[{"skill":"[skill name]","severity":"[High/Medium/Low]","fix":"[one-line actionable fix]"}]}`,
     "</JOB_FIT>",
+    "<RESUME_DATA>",
+    `{"personalInfo":{"name":"[full name]","email":"[email]","phone":"[phone]","location":"[city, country]","linkedin":"[linkedin url or empty]"},"summary":"[professional summary text]","experience":[{"id":"exp1","title":"[job title]","company":"[company]","location":"[city]","startDate":"[MMM YYYY]","endDate":"[MMM YYYY or Present]","bullets":["[bullet 1]","[bullet 2]"],"pageBreakBefore":false}],"education":[{"id":"edu1","degree":"[degree]","institution":"[school]","year":"[YYYY]"}],"skills":["[skill1]","[skill2]"],"certifications":["[cert1]"]}`,
+    "</RESUME_DATA>",
   ].join("\n");
 
   const jdBlock = `TARGET ROLE: ${jd.title || "Position"} at ${jd.company || "Company"}\n\nJOB DESCRIPTION:\n${jd.text}`;
@@ -389,6 +396,7 @@ async function generateResumeAndATS(
 
   const healthScore = parseJsonTag("HEALTH_SCORE");
   const jobFit = parseJsonTag("JOB_FIT");
+  const resumeData = parseJsonTag("RESUME_DATA");
 
   return {
     latex,
@@ -398,6 +406,7 @@ async function generateResumeAndATS(
     missing_keywords: parseKeywords("KEYWORDS_MISSING"),
     healthScore: healthScore ?? null,
     jobFit: jobFit ?? null,
+    resumeData: resumeData ?? null,
   };
 }
 
@@ -1135,5 +1144,33 @@ router.post(
     }
   },
 );
+
+// ── Quick ATS recheck (post-agent-edit) ──────────────────────────────────────
+router.post("/recheck-ats", async (req: Request, res: Response) => {
+  const { latex, jd } = req.body as { latex?: string; jd?: string };
+  if (!latex || !jd) {
+    res.status(400).json({ error: "latex and jd are required." });
+    return;
+  }
+  try {
+    const system = `You are an ATS expert. Analyze the resume against the job description. Return ONLY valid JSON with no markdown fences.`;
+    const userContent = `Compare this resume to the job description and return JSON exactly like this:
+{"score":85,"matched":["SQL","Power BI"],"missing":["Agile","MySQL"],"checks":[{"name":"Quantified bullets","passed":true,"score":90,"tip":"Good metrics usage"},{"name":"Weak verbs removed","passed":false,"score":60,"tip":"Replace helped with led"},{"name":"No pronouns","passed":true,"score":100,"tip":"Perfect"},{"name":"Keywords matched","passed":true,"score":85,"tip":"Most keywords present"},{"name":"Summary length","passed":true,"score":80,"tip":"Good length"},{"name":"Action verbs","passed":true,"score":90,"tip":"Strong action verbs used"}]}
+
+Resume (first 2000 chars):
+${latex.substring(0, 2000)}
+
+Job Description (first 1000 chars):
+${jd.substring(0, 1000)}`;
+
+    const raw = await callClaude(system, userContent, 1000);
+    const clean = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(clean);
+    res.json({ success: true, ats: parsed });
+  } catch (err) {
+    req.log.error({ err }, "ATS recheck failed");
+    res.status(500).json({ error: "Could not recheck ATS" });
+  }
+});
 
 export default router;

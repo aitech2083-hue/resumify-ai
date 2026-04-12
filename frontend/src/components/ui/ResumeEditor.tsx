@@ -1,45 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Code2, Pencil, Loader2, Check, X, RefreshCw } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
+import type { ResumeData, ResumeExperience, ResumeEducation, ResumePersonalInfo } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PersonalInfo {
-  name: string;
-  email: string;
-  phone: string;
-  location: string;
-  linkedin: string;
-}
-
-interface ExperienceEntry {
-  id: string;
-  title: string;
-  company: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  bullets: string[];
-}
-
-interface EducationEntry {
-  id: string;
-  degree: string;
-  institution: string;
-  year: string;
-}
-
-interface VisualResumeData {
-  personalInfo: PersonalInfo;
-  summary: string;
-  experience: ExperienceEntry[];
-  education: EducationEntry[];
-  skills: string[];
-  certifications: string[];
-}
+type PersonalInfo = ResumePersonalInfo;
+type ExperienceEntry = ResumeExperience;
+type EducationEntry = ResumeEducation;
+type VisualResumeData = ResumeData;
 
 export interface ResumeEditorProps {
   latex: string;
+  initialData?: ResumeData | null;
   jd?: { title?: string; company?: string; text?: string };
   onSave: (updatedLatex: string) => Promise<{ success: boolean; error?: string }>;
 }
@@ -78,9 +51,10 @@ function buildLatexFromData(d: VisualResumeData): string {
   const experienceSection = d.experience.length === 0 ? "" : `
 \\section*{Work Experience}
 \\vspace{-4pt}
-${d.experience.map(exp => {
+${d.experience.map((exp, idx) => {
   const bullets = exp.bullets.filter(Boolean);
-  return `\\noindent\\textbf{${escTex(exp.title)}} \\hfill ${escTex(exp.startDate)}${exp.endDate ? ` -- ${escTex(exp.endDate)}` : ""}\\\\
+  const pageBreak = exp.pageBreakBefore && idx > 0 ? "\\newpage\n" : "";
+  return `${pageBreak}\\noindent\\textbf{${escTex(exp.title)}} \\hfill ${escTex(exp.startDate)}${exp.endDate ? ` -- ${escTex(exp.endDate)}` : ""}\\\\
 \\textit{${escTex(exp.company)}${exp.location ? `, ${escTex(exp.location)}` : ""}}
 ${bullets.length > 0 ? `\\begin{itemize}[nosep,leftmargin=*,topsep=2pt,partopsep=0pt]
 ${bullets.map(b => `  \\item ${escTex(b)}`).join("\n")}
@@ -250,7 +224,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
 type ParseStatus = "idle" | "loading" | "done" | "error";
 type UpdateStatus = "idle" | "updating" | "success" | "error";
 
-export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
+export function ResumeEditor({ latex, initialData, jd, onSave }: ResumeEditorProps) {
   const [mode, setMode] = useState<"visual" | "latex">("visual");
   const [data, setData] = useState<VisualResumeData>(EMPTY_DATA);
   const [rawLatex, setRawLatex] = useState(latex);
@@ -260,6 +234,38 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
   const [skillInput, setSkillInput] = useState("");
   const [certInput, setCertInput] = useState("");
   const parsedForLatex = useRef<string>("");
+
+  // ── Use pre-parsed initialData when provided (skips API call) ────────────
+  const initialDataApplied = useRef(false);
+  useEffect(() => {
+    if (!initialData || initialDataApplied.current) return;
+    initialDataApplied.current = true;
+    setData({
+      personalInfo: { ...initialData.personalInfo },
+      summary: initialData.summary || "",
+      experience: (initialData.experience || []).map(e => ({
+        id: e.id || uuidv4(),
+        title: e.title || "",
+        company: e.company || "",
+        location: e.location || "",
+        startDate: e.startDate || "",
+        endDate: e.endDate || "",
+        bullets: Array.isArray(e.bullets) ? e.bullets.filter(Boolean) : [],
+        pageBreakBefore: e.pageBreakBefore ?? false,
+      })),
+      education: (initialData.education || []).map(e => ({
+        id: e.id || uuidv4(),
+        degree: e.degree || "",
+        institution: e.institution || "",
+        year: e.year || "",
+      })),
+      skills: Array.isArray(initialData.skills) ? initialData.skills.filter(Boolean) : [],
+      certifications: Array.isArray(initialData.certifications) ? initialData.certifications.filter(Boolean) : [],
+    });
+    parsedForLatex.current = latex;
+    setParseStatus("done");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData]);
 
   // ── Undo / Redo ──────────────────────────────────────────────────────────
   const [editHistory, setEditHistory] = useState<VisualResumeData[]>([]);
@@ -388,6 +394,7 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
           startDate: e.startDate || "",
           endDate: e.endDate || "",
           bullets: Array.isArray(e.bullets) ? e.bullets.filter(Boolean) : [],
+          pageBreakBefore: e.pageBreakBefore ?? false,
         })),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         education: (d.education || []).map((e: any) => ({
@@ -417,7 +424,7 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
   const removeExpBullet = (id: string, bi: number) =>
     updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.filter((_, i) => i !== bi) } : e) }));
   const addExperience = () =>
-    updateData(d => ({ ...d, experience: [...d.experience, { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""] }] }));
+    updateData(d => ({ ...d, experience: [...d.experience, { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""], pageBreakBefore: false }] }));
   const removeExperience = (id: string) => {
     if (!confirm("Remove this experience entry?")) return;
     updateData(d => ({ ...d, experience: d.experience.filter(e => e.id !== id) }));
@@ -660,8 +667,21 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
             {data.experience.length === 0 && (
               <p style={{ fontSize: "12px", color: "#888888", textAlign: "center", padding: "16px 0", margin: 0 }}>No experience entries. Click "+ Add" to add one.</p>
             )}
-            {data.experience.map(exp => (
-              <div key={exp.id} style={{ background: "#0a0a0a", border: "1px solid #262626", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
+            {data.experience.map((exp, expIdx) => (
+              <div key={exp.id}>
+                {/* Page break indicator — click to remove */}
+                {exp.pageBreakBefore && expIdx > 0 && (
+                  <div
+                    onClick={() => updateData(d => ({ ...d, experience: d.experience.map(e => e.id === exp.id ? { ...e, pageBreakBefore: false } : e) }))}
+                    style={{ borderTop: '2px dashed #333333', margin: '8px 0 4px 0', position: 'relative', cursor: 'pointer' }}
+                    title="Click to remove page break"
+                  >
+                    <span style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: '#0a0a0a', padding: '0 8px', fontSize: '9px', color: '#444444', whiteSpace: 'nowrap' }}>
+                      ↑ Page Break — click to remove
+                    </span>
+                  </div>
+                )}
+              <div style={{ background: "#0a0a0a", border: "1px solid #262626", borderRadius: "10px", padding: "16px", marginBottom: "12px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                   <div>
                     <FieldLabel>Job Title</FieldLabel>
@@ -701,8 +721,18 @@ export function ResumeEditor({ latex, jd, onSave }: ResumeEditorProps) {
                 ))}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
                   <AddBtn onClick={() => addExpBullet(exp.id)} label="+ Add bullet" />
-                  <RemoveBtn onClick={() => removeExperience(exp.id)} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button
+                      onClick={() => updateData(d => ({ ...d, experience: d.experience.map(e => e.id === exp.id ? { ...e, pageBreakBefore: !e.pageBreakBefore } : e) }))}
+                      style={{ background: 'transparent', border: `1px solid ${exp.pageBreakBefore ? '#2563eb' : '#333333'}`, color: exp.pageBreakBefore ? '#ffffff' : '#666666', fontSize: '10px', borderRadius: '5px', padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit', transition: 'border-color 0.15s, color 0.15s' }}
+                      title="Toggle page break before this entry"
+                    >
+                      ⊞ Page break
+                    </button>
+                    <RemoveBtn onClick={() => removeExperience(exp.id)} />
+                  </div>
                 </div>
+              </div>
               </div>
             ))}
           </SectionCard>

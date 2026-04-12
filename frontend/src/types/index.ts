@@ -74,6 +74,41 @@ export interface JobFit {
   gaps: JobFitGap[];
 }
 
+export interface ResumePersonalInfo {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedin: string;
+}
+
+export interface ResumeExperience {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  bullets: string[];
+  pageBreakBefore: boolean;
+}
+
+export interface ResumeEducation {
+  id: string;
+  degree: string;
+  institution: string;
+  year: string;
+}
+
+export interface ResumeData {
+  personalInfo: ResumePersonalInfo;
+  summary: string;
+  experience: ResumeExperience[];
+  education: ResumeEducation[];
+  skills: string[];
+  certifications: string[];
+}
+
 export interface JobResult {
   jdIndex: number;
   company: string;
@@ -87,6 +122,7 @@ export interface JobResult {
   coverLetter: string;
   healthScore: HealthScore | null;
   jobFit: JobFit | null;
+  resumeData: ResumeData | null;
 }
 
 export interface LinkedInContent {
