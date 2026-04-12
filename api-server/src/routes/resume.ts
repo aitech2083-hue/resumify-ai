@@ -259,6 +259,36 @@ async function callClaude(
   throw lastErr ?? new Error("Claude API: max retries exceeded");
 }
 
+/** FIX 2: Strip markdown formatting from plain text (bullets, summaries).
+ *  Removes **bold**, *italic*, `code`, and # headings so text is stored as
+ *  clean plain text that escTex (frontend) or LaTeX can handle safely. */
+function cleanMarkdown(text: string): string {
+  return (text ?? "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")   // **bold** → plain
+    .replace(/\*(.+?)\*/g,     "$1")   // *italic* → plain
+    .replace(/`(.+?)`/g,       "$1")   // `code` → plain
+    .replace(/^#{1,6}\s+/gm,   "")     // # headings → plain
+    .trim();
+}
+
+/** FIX 3: Last-line-of-defence — convert any residual markdown in LaTeX source
+ *  to proper LaTeX commands before handing off to pdflatex.
+ *  Only touches content lines — skips lines starting with \ or % (LaTeX syntax). */
+function sanitizeLatexMarkdown(latex: string): string {
+  return latex
+    .split("\n")
+    .map(line => {
+      const trimmed = line.trimStart();
+      if (trimmed === "" || trimmed.startsWith("\\") || trimmed.startsWith("%")) {
+        return line; // leave LaTeX / comment lines untouched
+      }
+      return line
+        .replace(/\*\*(.+?)\*\*/g, "\\textbf{$1}")
+        .replace(/\*(.+?)\*/g,     "\\textit{$1}");
+    })
+    .join("\n");
+}
+
 function extractTag(text: string, tag: string): string {
   const m = text.match(new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, "i"));
   if (!m) return "";
@@ -1079,6 +1109,25 @@ Use exactly this structure (empty string if a field is not found):
       return;
     }
 
+    // Sanitize markdown from bullets (agent sometimes returns **bold** syntax)
+    if (data && typeof data === "object" && data !== null) {
+      const d = data as Record<string, unknown>;
+      if (Array.isArray(d.experience)) {
+        d.experience = (d.experience as Array<Record<string, unknown>>).map(exp => ({
+          ...exp,
+          bullets: Array.isArray(exp.bullets)
+            ? (exp.bullets as string[]).map(b => cleanMarkdown(b))
+            : exp.bullets,
+        }));
+      }
+      if (Array.isArray(d.certifications)) {
+        d.certifications = (d.certifications as string[]).map(c => cleanMarkdown(c));
+      }
+      if (typeof d.summary === "string") {
+        d.summary = cleanMarkdown(d.summary);
+      }
+    }
+
     console.log("parse-latex: success");
     res.json({ success: true, data });
   } catch (err) {
@@ -1208,6 +1257,15 @@ router.post(
     }
 
     const system = [
+      "⚠️ CRITICAL FORMATTING RULE — READ FIRST:",
+      "You are working with LaTeX documents. NEVER use markdown formatting in any text you write.",
+      "FORBIDDEN — never output these anywhere:",
+      "  **bold text**   *italic text*   `code`   # headings   ## headings",
+      "CORRECT LaTeX equivalents:",
+      "  Bold: \\textbf{text}    Italic: \\textit{text}",
+      "When suggesting bullet point changes or edits, return PLAIN TEXT ONLY.",
+      "The system handles all LaTeX formatting. Markdown causes immediate PDF compilation failure.",
+      "",
       "You are RezAI Agent — a world-class career coach, resume expert, and interview specialist.",
       "",
       "━━━ CANDIDATE CONTEXT ━━━",
@@ -1310,7 +1368,8 @@ router.post(
 
     try {
       await mkdir(workDir, { recursive: true });
-      await writeFile(texFile, latex, "utf-8");
+      // FIX 3: sanitize any residual markdown before pdflatex sees it
+      await writeFile(texFile, sanitizeLatexMarkdown(latex), "utf-8");
 
       // Single pdflatex pass — sufficient for plain resumes (no TOC/refs)
       try {
