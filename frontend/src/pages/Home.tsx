@@ -109,6 +109,18 @@ export default function Home() {
   const [showChangingJd, setShowChangingJd] = useState(false);
   const [showSidebarExtra, setShowSidebarExtra] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<'classic'|'modern'|'compact'|'executive'>('classic');
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<'classic'|'modern'|'compact'|'executive'>('classic');
+
+  const TEMPLATE_ORDER = ['classic', 'modern', 'compact', 'executive'] as const;
+  const navigateToPrevTemplate = () => {
+    const idx = TEMPLATE_ORDER.indexOf(previewTemplate);
+    setPreviewTemplate(TEMPLATE_ORDER[idx > 0 ? idx - 1 : TEMPLATE_ORDER.length - 1]);
+  };
+  const navigateToNextTemplate = () => {
+    const idx = TEMPLATE_ORDER.indexOf(previewTemplate);
+    setPreviewTemplate(TEMPLATE_ORDER[idx < TEMPLATE_ORDER.length - 1 ? idx + 1 : 0]);
+  };
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [jobTrackerStage, setJobTrackerStage] = useState<string | null>(null);
   const [generateStep, setGenerateStep] = useState(-1);
@@ -186,6 +198,21 @@ export default function Home() {
   // -- Hooks --
   const generateMut = useGenerateResume();
   const { history, saveHistory, deleteHistory, clearHistory } = useHistory();
+
+  // -- Template preview keyboard navigation --
+  useEffect(() => {
+    if (!showTemplatePreview) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape')     setShowTemplatePreview(false);
+      if (e.key === 'ArrowLeft')  navigateToPrevTemplate();
+      if (e.key === 'ArrowRight') navigateToNextTemplate();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  // navigatePrev/Next are stable arrow fns redefined each render — listing
+  // previewTemplate as dep ensures they close over the current value
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTemplatePreview, previewTemplate]);
 
   // -- Generate Step Progress --
   useEffect(() => {
@@ -1329,13 +1356,21 @@ export default function Home() {
                                     }}
                                   >
                                     {preview}
-                                    <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                      <div>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: "#ffffff" }}>{meta[tid].name}</div>
-                                        <div style={{ fontSize: 10, color: "#666666", marginTop: 1 }}>{meta[tid].desc}</div>
-                                      </div>
+                                    <div style={{ marginTop: 8 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: "#ffffff" }}>{meta[tid].name}</div>
+                                      <div style={{ fontSize: 10, color: "#666666", marginTop: 1 }}>{meta[tid].desc}</div>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                                      <button
+                                        onClick={e => { e.stopPropagation(); setPreviewTemplate(tid); setShowTemplatePreview(true); }}
+                                        onMouseEnter={e => { e.stopPropagation(); (e.currentTarget as HTMLButtonElement).style.borderColor = "#2563eb"; (e.currentTarget as HTMLButtonElement).style.color = "#ffffff"; }}
+                                        onMouseLeave={e => { e.stopPropagation(); (e.currentTarget as HTMLButtonElement).style.borderColor = "#333333"; (e.currentTarget as HTMLButtonElement).style.color = "#888888"; }}
+                                        style={{ background: "transparent", border: "1px solid #333333", color: "#888888", borderRadius: 5, padding: "4px 10px", fontSize: 10, cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.15s, color 0.15s" }}
+                                      >
+                                        Preview
+                                      </button>
                                       {sel && (
-                                        <div style={{ background: "#2563eb", color: "#ffffff", borderRadius: 5, padding: "2px 8px", fontSize: 10, fontWeight: 600, flexShrink: 0 }}>
+                                        <div style={{ background: "#2563eb", color: "#ffffff", borderRadius: 5, padding: "3px 8px", fontSize: 10, fontWeight: 600 }}>
                                           Selected
                                         </div>
                                       )}
@@ -1370,6 +1405,184 @@ export default function Home() {
               </div>
             </motion.div>
           )}
+
+          {/* ═══ TEMPLATE PREVIEW MODAL ═══ */}
+          {showTemplatePreview && (() => {
+            const pt = previewTemplate;
+            const modalMeta: Record<string, { name: string; desc: string }> = {
+              classic:   { name: "Classic",   desc: "Corporate · ATS safe · Traditional serif" },
+              modern:    { name: "Modern",    desc: "Tech · Startup · Bold blue header" },
+              compact:   { name: "Compact",   desc: "Dense · Senior · Maximum content on 1 page" },
+              executive: { name: "Executive", desc: "Two-column · Leadership · Dark sidebar" },
+            };
+
+            const largePreview = pt === "classic" ? (
+              <div style={{ background: "#ffffff", borderRadius: 8, padding: 32, minHeight: 500, fontFamily: "Georgia, serif", color: "#000000" }}>
+                <div style={{ textAlign: "center", marginBottom: 12 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.05em" }}>ALEX JOHNSON</div>
+                  <div style={{ fontSize: 11, color: "#444444", marginTop: 3 }}>alex@email.com · +91 98765 43210 · Bangalore, India</div>
+                </div>
+                <hr style={{ border: "none", borderTop: "1px solid #000000", margin: "10px 0" }} />
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 6 }}>PROFESSIONAL SUMMARY</div>
+                <div style={{ fontSize: 11, color: "#333333", lineHeight: 1.6, marginBottom: 12 }}>Results-driven Senior Business Analyst with 5+ years of experience delivering data-driven insights across e-commerce and logistics domains. Proven track record of reducing operational costs and improving reporting efficiency.</div>
+                <hr style={{ border: "none", borderTop: "1px solid #000000", margin: "10px 0" }} />
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 8 }}>WORK EXPERIENCE</div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>Senior Business Analyst</div>
+                  <div style={{ fontSize: 11, color: "#444444" }}>2021 – Present</div>
+                </div>
+                <div style={{ fontSize: 11, color: "#444444", fontStyle: "italic", marginBottom: 4 }}>Infosys Ltd, Bangalore</div>
+                <div style={{ fontSize: 11, color: "#333333", marginLeft: 12, lineHeight: 1.7 }}>
+                  • Developed 15+ Power BI dashboards reducing reporting time by 40%<br/>
+                  • Authored complex SQL queries on PostgreSQL for 100M+ row datasets<br/>
+                  • Led cross-functional requirements gathering across 5 business units
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, marginBottom: 2 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>Business Analyst</div>
+                  <div style={{ fontSize: 11, color: "#444444" }}>2019 – 2021</div>
+                </div>
+                <div style={{ fontSize: 11, color: "#444444", fontStyle: "italic", marginBottom: 4 }}>Wipro Technologies, Hyderabad</div>
+                <div style={{ fontSize: 11, color: "#333333", marginLeft: 12, lineHeight: 1.7 }}>
+                  • Delivered 3 enterprise analytics projects on time and under budget<br/>
+                  • Reduced data reconciliation errors by 35% through automated pipelines
+                </div>
+                <hr style={{ border: "none", borderTop: "1px solid #000000", margin: "10px 0" }} />
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 6 }}>EDUCATION</div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700 }}>MBA — IIM Bangalore</div>
+                  <div style={{ fontSize: 11, color: "#444444" }}>2021</div>
+                </div>
+                <div style={{ fontSize: 11, color: "#444444" }}>B.Tech Computer Science — NIT Trichy, 2017</div>
+                <hr style={{ border: "none", borderTop: "1px solid #000000", margin: "10px 0" }} />
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 6 }}>SKILLS</div>
+                <div style={{ fontSize: 11, color: "#333333" }}>SQL · Power BI · Python · Agile · Tableau · JIRA · Excel · Confluence</div>
+              </div>
+            ) : pt === "modern" ? (
+              <div style={{ background: "#ffffff", borderRadius: 8, minHeight: 500, fontFamily: "Arial, sans-serif", overflow: "hidden" }}>
+                <div style={{ background: "#2563eb", padding: "24px 32px", borderRadius: "8px 8px 0 0" }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "#ffffff" }}>Alex Johnson</div>
+                  <div style={{ fontSize: 13, color: "#bfdbfe", marginTop: 3 }}>Senior Business Analyst</div>
+                  <div style={{ fontSize: 11, color: "#93c5fd", marginTop: 4 }}>alex@email.com · +91 98765 43210 · Bangalore</div>
+                </div>
+                <div style={{ padding: "20px 32px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2563eb", borderBottom: "1px solid #2563eb", paddingBottom: 3, marginBottom: 10, letterSpacing: "0.06em" }}>PROFESSIONAL SUMMARY</div>
+                  <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.6, marginBottom: 14 }}>Results-driven Senior Business Analyst with 5+ years delivering data-driven insights. Expert in Power BI, SQL, and cross-functional stakeholder management.</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2563eb", borderBottom: "1px solid #2563eb", paddingBottom: 3, marginBottom: 10, letterSpacing: "0.06em" }}>WORK EXPERIENCE</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Senior Business Analyst</div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>2021 – Present</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4 }}>Infosys Ltd, Bangalore</div>
+                  <div style={{ fontSize: 11, color: "#374151", marginLeft: 12, lineHeight: 1.7 }}>
+                    • Developed 15+ Power BI dashboards reducing reporting time by 40%<br/>
+                    • Authored complex SQL queries on PostgreSQL for 100M+ row datasets<br/>
+                    • Led cross-functional requirements gathering across 5 business units
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2563eb", borderBottom: "1px solid #2563eb", paddingBottom: 3, margin: "12px 0 8px", letterSpacing: "0.06em" }}>EDUCATION</div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#111827" }}>MBA — IIM Bangalore</div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>2021</div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#2563eb", borderBottom: "1px solid #2563eb", paddingBottom: 3, margin: "12px 0 8px", letterSpacing: "0.06em" }}>SKILLS</div>
+                  <div style={{ fontSize: 11, color: "#374151" }}>SQL · Power BI · Python · Agile · Tableau · JIRA · Excel · Confluence</div>
+                </div>
+              </div>
+            ) : pt === "compact" ? (
+              <div style={{ background: "#ffffff", borderRadius: 8, padding: 28, minHeight: 500, fontFamily: "Arial, sans-serif", color: "#000000" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "2px solid #000000", paddingBottom: 5, marginBottom: 8 }}>
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>ALEX JOHNSON</div>
+                  <div style={{ fontSize: 10, color: "#444444" }}>alex@email.com · +91 98765 43210 · Bangalore, India</div>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 3 }}>PROFESSIONAL SUMMARY</div>
+                <div style={{ fontSize: 10, color: "#333333", lineHeight: 1.4, marginBottom: 8 }}>Results-driven Senior Business Analyst with 5+ years of experience delivering data-driven insights. Expert in Power BI, SQL, Python, and stakeholder management across e-commerce and logistics domains.</div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 3 }}>WORK EXPERIENCE</div>
+                <div style={{ fontSize: 10.5, fontWeight: 700 }}>Senior Business Analyst, Infosys Ltd <span style={{ fontWeight: 400, color: "#555555" }}>· 2021–Present</span></div>
+                <div style={{ fontSize: 10, color: "#333333", marginLeft: 8, lineHeight: 1.4 }}>• Developed 15+ Power BI dashboards reducing reporting time by 40%</div>
+                <div style={{ fontSize: 10, color: "#333333", marginLeft: 8, lineHeight: 1.4 }}>• Authored complex SQL queries on PostgreSQL for 100M+ row datasets</div>
+                <div style={{ fontSize: 10, color: "#333333", marginLeft: 8, lineHeight: 1.4, marginBottom: 4 }}>• Led cross-functional requirements gathering across 5 business units</div>
+                <div style={{ fontSize: 10.5, fontWeight: 700 }}>Business Analyst, Wipro Technologies <span style={{ fontWeight: 400, color: "#555555" }}>· 2019–2021</span></div>
+                <div style={{ fontSize: 10, color: "#333333", marginLeft: 8, lineHeight: 1.4 }}>• Delivered 3 enterprise analytics projects on time and under budget</div>
+                <div style={{ fontSize: 10, color: "#333333", marginLeft: 8, lineHeight: 1.4, marginBottom: 6 }}>• Reduced data reconciliation errors by 35% through automated pipelines</div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", marginBottom: 3 }}>EDUCATION</div>
+                <div style={{ fontSize: 10, color: "#333333", marginBottom: 1 }}>MBA — IIM Bangalore, 2021 · B.Tech CS — NIT Trichy, 2017</div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", margin: "6px 0 3px" }}>SKILLS</div>
+                <div style={{ fontSize: 10, color: "#333333" }}>SQL · Power BI · Python · Agile · Tableau · JIRA · Excel · Confluence · Stakeholder Mgmt · ETL</div>
+              </div>
+            ) : (
+              <div style={{ background: "#ffffff", borderRadius: 8, minHeight: 500, fontFamily: "Arial, sans-serif", display: "grid", gridTemplateColumns: "35% 65%", overflow: "hidden" }}>
+                <div style={{ background: "#1e293b", padding: 24 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#ffffff", marginBottom: 2 }}>Alex Johnson</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 16 }}>Sr. Business Analyst</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#60a5fa", letterSpacing: "0.06em", marginBottom: 6 }}>CONTACT</div>
+                  <div style={{ fontSize: 10, color: "#cbd5e1", marginBottom: 14, lineHeight: 1.7 }}>alex@email.com<br/>+91 98765 43210<br/>Bangalore, India<br/>linkedin.com/in/alex</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#60a5fa", letterSpacing: "0.06em", marginBottom: 6 }}>SKILLS</div>
+                  <div style={{ fontSize: 10, color: "#cbd5e1", lineHeight: 1.8 }}>SQL<br/>Power BI<br/>Python<br/>Agile<br/>Tableau<br/>JIRA<br/>Excel<br/>Confluence</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#60a5fa", letterSpacing: "0.06em", margin: "14px 0 6px" }}>EDUCATION</div>
+                  <div style={{ fontSize: 10, color: "#cbd5e1", lineHeight: 1.6 }}>MBA<br/>IIM Bangalore, 2021<br/><br/>B.Tech CS<br/>NIT Trichy, 2017</div>
+                </div>
+                <div style={{ padding: 24 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#1e293b", letterSpacing: "0.06em", borderBottom: "1px solid #e2e8f0", paddingBottom: 4, marginBottom: 8 }}>PROFESSIONAL SUMMARY</div>
+                  <div style={{ fontSize: 10, color: "#374151", lineHeight: 1.6, marginBottom: 12 }}>Results-driven Senior Business Analyst with 5+ years of experience delivering data-driven insights across e-commerce and logistics. Expert in cross-functional stakeholder management and enterprise analytics.</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#1e293b", letterSpacing: "0.06em", borderBottom: "1px solid #e2e8f0", paddingBottom: 4, marginBottom: 8 }}>WORK EXPERIENCE</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#111827" }}>Senior Business Analyst</div>
+                  <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>Infosys Ltd · 2021 – Present</div>
+                  <div style={{ fontSize: 10, color: "#374151", marginLeft: 8, lineHeight: 1.5 }}>• Developed 15+ Power BI dashboards reducing reporting time by 40%</div>
+                  <div style={{ fontSize: 10, color: "#374151", marginLeft: 8, lineHeight: 1.5 }}>• Authored complex SQL queries on PostgreSQL for 100M+ row datasets</div>
+                  <div style={{ fontSize: 10, color: "#374151", marginLeft: 8, lineHeight: 1.5, marginBottom: 8 }}>• Led cross-functional requirements gathering across 5 business units</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#111827" }}>Business Analyst</div>
+                  <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 4 }}>Wipro Technologies · 2019 – 2021</div>
+                  <div style={{ fontSize: 10, color: "#374151", marginLeft: 8, lineHeight: 1.5 }}>• Delivered 3 enterprise analytics projects on time and under budget</div>
+                  <div style={{ fontSize: 10, color: "#374151", marginLeft: 8, lineHeight: 1.5 }}>• Reduced data reconciliation errors by 35%</div>
+                </div>
+              </div>
+            );
+
+            return (
+              <div
+                onClick={() => setShowTemplatePreview(false)}
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <div
+                  onClick={e => e.stopPropagation()}
+                  style={{ background: "#141414", border: "1px solid #262626", borderRadius: 16, padding: 24, width: 600, maxWidth: "90vw", maxHeight: "85vh", overflowY: "auto", position: "relative" }}
+                >
+                  {/* Header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: "#ffffff", textTransform: "capitalize" }}>{pt} Template</div>
+                      <div style={{ fontSize: 12, color: "#666666", marginTop: 2 }}>Sample preview with demo data</div>
+                    </div>
+                    <button
+                      onClick={() => setShowTemplatePreview(false)}
+                      style={{ background: "#1e1e1e", border: "1px solid #333333", color: "#888888", borderRadius: 6, width: 32, height: 32, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}
+                    >✕</button>
+                  </div>
+
+                  {/* Large resume preview */}
+                  {largePreview}
+
+                  {/* Navigation */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 20, paddingTop: 16, borderTop: "1px solid #262626" }}>
+                    <button onClick={navigateToPrevTemplate} style={{ background: "#1e1e1e", border: "1px solid #333333", color: "#888888", borderRadius: 8, padding: "8px 16px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>← Previous</button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {TEMPLATE_ORDER.map(t => (
+                        <div key={t} onClick={() => setPreviewTemplate(t)} style={{ width: 8, height: 8, borderRadius: "50%", background: pt === t ? "#2563eb" : "#333333", cursor: "pointer" }} />
+                      ))}
+                    </div>
+                    <button onClick={navigateToNextTemplate} style={{ background: "#1e1e1e", border: "1px solid #333333", color: "#888888", borderRadius: 8, padding: "8px 16px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Next →</button>
+                  </div>
+
+                  {/* Use this template */}
+                  <button
+                    onClick={() => { setSelectedTemplate(pt); setShowTemplatePreview(false); }}
+                    style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%", marginTop: 12, fontFamily: "inherit", textTransform: "capitalize" }}
+                  >
+                    Use {pt} Template
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ═══ AFTER GENERATE: TWO-PANEL LAYOUT ═══ */}
           {result && (
