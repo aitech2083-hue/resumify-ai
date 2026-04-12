@@ -1682,6 +1682,7 @@ export default function Home() {
                               )
                             ) : (
                               <ResumeEditor
+                                key={activeJdTab}
                                 latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
                                 initialData={result.results[activeJdTab].resumeData as any ?? null}
                                 jd={jds[activeJdTab]}

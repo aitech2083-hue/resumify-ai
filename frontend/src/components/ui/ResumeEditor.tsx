@@ -236,9 +236,12 @@ export function ResumeEditor({ latex, initialData, jd, onSave }: ResumeEditorPro
   const parsedForLatex = useRef<string>("");
 
   // ── Use pre-parsed initialData when provided (skips API call) ────────────
+  // initialDataApplied ref is used only by doParseLatex GUARD to short-circuit
+  // the parse-latex API. The effect itself always re-applies when initialData changes
+  // (e.g. user switches between job tabs in the parent).
   const initialDataApplied = useRef(false);
   useEffect(() => {
-    if (!initialData || initialDataApplied.current) return;
+    if (!initialData) return;
     initialDataApplied.current = true;
     setData({
       personalInfo: { ...initialData.personalInfo },
@@ -342,15 +345,34 @@ export function ResumeEditor({ latex, initialData, jd, onSave }: ResumeEditorPro
   }, [mode, parseStatus]);
 
   // Reset parse state when latex prop changes (e.g. after agent edit)
+  // GUARD: Don't reset to "idle" if data was already populated from initialData —
+  // that would re-trigger the slow parse-latex API call needlessly.
   useEffect(() => {
     setRawLatex(latex);
     if (parsedForLatex.current !== latex) {
-      setParseStatus("idle");
+      if (!initialDataApplied.current) {
+        // Only reset if we don't already have structured data loaded
+        setParseStatus("idle");
+      }
       parsedForLatex.current = "";
     }
   }, [latex]);
 
   const doParseLatex = async () => {
+    // GUARD 1: If initialData already populated this editor, skip the API entirely.
+    // This is the fast-path — 0ms open time when resumeData was returned by the backend.
+    if (initialDataApplied.current) {
+      setParseStatus("done");
+      return;
+    }
+
+    // GUARD 2: If we already have structured data in state (e.g. name is filled),
+    // don't burn an API call just because parseStatus reset to idle.
+    if (data.personalInfo.name && data.personalInfo.name.length > 0) {
+      setParseStatus("done");
+      return;
+    }
+
     if (parsedForLatex.current === latex && parseStatus === "done") return;
 
     // Validate latex is present
