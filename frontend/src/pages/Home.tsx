@@ -1704,23 +1704,20 @@ export default function Home() {
                                 initialData={result.results[activeJdTab].resumeData as any ?? null}
                                 jd={jds[activeJdTab]}
                                 onDataChange={(updatedData: ResumeData) => {
-                                  // Keep result state fresh so re-mounting the editor
-                                  // always shows the user's last edited version
+                                  if (!updatedData) return;
+                                  // results is a JobResult[] array — update with index splice,
+                                  // never spread into an object (breaks .map / .length)
                                   setResult(prev => {
                                     if (!prev) return prev;
-                                    return {
-                                      ...prev,
-                                      results: {
-                                        ...prev.results,
-                                        [activeJdTab]: {
-                                          ...prev.results[activeJdTab],
-                                          resumeData: updatedData,
-                                        },
-                                      },
+                                    const newResults = [...prev.results];
+                                    newResults[activeJdTab] = {
+                                      ...newResults[activeJdTab],
+                                      resumeData: updatedData,
                                     };
+                                    return { ...prev, results: newResults };
                                   });
-                                  // Also keep editableLatex in sync so Preview/Download
-                                  // always uses the latest edited content
+                                  // Keep editableLatex in sync so Preview/Download
+                                  // always reflects the latest edited content
                                   const latestLatex = buildLatexFromData(updatedData);
                                   setEditableLatex(prev => ({ ...prev, [activeJdTab]: latestLatex }));
                                 }}
