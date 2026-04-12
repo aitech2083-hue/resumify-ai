@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { cn, copyToClipboard, generateOverleafUrl } from "@/lib/utils";
-import type { Mode, Tone, JD, ScratchData, GenerateResponse, AtsScore } from "@/types";
+import type { Mode, JD, ScratchData, GenerateResponse, AtsScore } from "@/types";
 import { useGenerateResume } from "@/hooks/use-generate";
 import { useHistory } from "@/hooks/use-history";
 
@@ -59,7 +59,6 @@ export default function Home() {
 
   // -- App State --
   const [mode, setMode] = useState<Mode>("upload");
-  const [tone, setTone] = useState<Tone>("formal");
 
   // -- Input State --
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -127,6 +126,8 @@ export default function Home() {
   const [agentInput, setAgentInput] = useState("");
   const [agentLoading, setAgentLoading] = useState<Record<number, boolean>>({});
   const [agentGreeted, setAgentGreeted] = useState<Record<number, boolean>>({});
+  const [atsRechecking, setAtsRechecking] = useState<Record<number, boolean>>({});
+  const [atsUpdated, setAtsUpdated] = useState<Record<number, boolean>>({});
   const [agentOpen, setAgentOpen] = useState(false);
   const agentBottomRef = useRef<HTMLDivElement>(null);
   const agentBubbleBottomRef = useRef<HTMLDivElement>(null);
@@ -207,7 +208,7 @@ export default function Home() {
       if (mode === "scratch") extraNotes = extraScratchNotes;
 
       const data = await generateMut.mutateAsync({
-        mode, tone, jds,
+        mode, tone: "formal", jds,
         extra: extraNotes,
         scratchData: mode === "scratch" ? scratchData : undefined,
         resumeFile, linkedinFile,
@@ -360,6 +361,40 @@ export default function Home() {
           }
           setPreviewLoading(prev => ({ ...prev, [tab]: false }));
         });
+        // Auto-recheck ATS after agent edits resume
+        const jdText = jds[tab]?.text || "";
+        if (jdText.length > 10) {
+          setAtsRechecking(prev => ({ ...prev, [tab]: true }));
+          const baseUrl = import.meta.env.BASE_URL || "/";
+          fetch(`${baseUrl}api/resume/recheck-ats`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ latex: data.latex, jd: jdText }),
+          })
+            .then(r => r.json())
+            .then(recheckData => {
+              if (recheckData.success && result) {
+                setResult(prev => {
+                  if (!prev) return prev;
+                  const updated = [...prev.results];
+                  updated[tab] = {
+                    ...updated[tab],
+                    atsTailored: { ...updated[tab].atsTailored, score: recheckData.ats.score },
+                    matched_keywords: recheckData.ats.matched || updated[tab].matched_keywords,
+                    missing_keywords: recheckData.ats.missing || updated[tab].missing_keywords,
+                    healthScore: recheckData.ats.checks
+                      ? { overall: recheckData.ats.score, checks: recheckData.ats.checks }
+                      : updated[tab].healthScore,
+                  };
+                  return { ...prev, results: updated };
+                });
+                setAtsUpdated(prev => ({ ...prev, [tab]: true }));
+                setTimeout(() => setAtsUpdated(prev => ({ ...prev, [tab]: false })), 3000);
+              }
+            })
+            .catch(() => {})
+            .finally(() => setAtsRechecking(prev => ({ ...prev, [tab]: false })));
+        }
       }
       if (data.action) {
         if (data.action.startsWith("tab:")) setActiveFeatureTab(data.action.replace("tab:", ""));
@@ -1108,10 +1143,6 @@ export default function Home() {
                                 value={jds[0]?.text || ""} onChange={e => { const n = [...jds]; n[0].text = e.target.value; setJds(n); }}
                                 className="card-textarea min-h-[120px]"
                               />
-                              <button onClick={() => { setMultiJdOpen(true); if (jds.length < 2) setJds([...jds, { id: uuidv4(), title: "", company: "", text: "" }]); }}
-                                className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium">
-                                <ChevronRight className="w-3.5 h-3.5" /> Apply to multiple jobs at once
-                              </button>
                             </div>
                           ) : (
                             /* Multi JD mode */
@@ -1148,20 +1179,8 @@ export default function Home() {
                           )}
                         </div>
 
-                        {/* Tone selector */}
-                        <div className="pt-1 border-t border-[var(--rz-border)]/60">
-                          <label className="text-[10px] font-bold tracking-widest uppercase text-[var(--rz-muted)] mb-2 block">Outreach Tone</label>
-                          <div className="flex gap-2">
-                            {(["formal", "warm", "concise"] as Tone[]).map(t => (
-                              <button key={t} onClick={() => setTone(t)} className={cn("flex-1 py-2 rounded-lg border text-xs font-semibold transition-all capitalize",
-                                tone === t ? "bg-primary/10 border-primary text-primary" : "bg-[var(--rz-bg)] border-[var(--rz-border)] text-[var(--rz-muted)] hover:border-primary/40 hover:text-foreground")}>
-                                {t}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
 
-                          </div>{/* end card body - tone selector */}
+                          </div>{/* end card body */}
 
                           {/* Card footer */}
                           <div className="px-6 pb-6 space-y-3">
@@ -1175,7 +1194,7 @@ export default function Home() {
                               disabled={generateMut.isPending}
                               className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-primary to-[var(--rz-accent-hover)] text-[var(--rz-accent-text)] hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60"
                             >
-                              <Zap className="w-5 h-5 fill-current" /> ⚡ Generate
+                              <Zap className="w-5 h-5 fill-current" /> Generate
                             </button>
                             <p className="text-center text-xs text-[var(--rz-muted)]">Usually takes 30–45 seconds · Free forever</p>
                           </div>
@@ -1346,7 +1365,7 @@ export default function Home() {
                       : mode === "scratch" ? `${scratchData.name || "Scratch"} — built manually`
                       : "Resume uploaded"}
                   </div>
-                  <div className="text-[10px] text-[var(--rz-muted)] mt-0.5 capitalize">{mode} mode · {tone} tone</div>
+                  <div className="text-[10px] text-[var(--rz-muted)] mt-0.5 capitalize">{mode} mode</div>
                 </div>
 
                 {/* JD Tabs */}
@@ -1626,6 +1645,7 @@ export default function Home() {
                             ) : (
                               <ResumeEditor
                                 latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
+                                initialData={result.results[activeJdTab].resumeData as any ?? null}
                                 jd={jds[activeJdTab]}
                                 onSave={async (updatedLatex: string) => {
                                   // Fast path: single pdflatex pass, returns base64 JSON
@@ -1715,6 +1735,13 @@ export default function Home() {
 
                         return (
                           <div style={{ maxWidth: 860, margin: "0 auto" }}>
+
+                            {/* ATS recheck notification */}
+                            {atsUpdated[activeJdTab] && (
+                              <div style={{ background: '#0d2818', border: '1px solid #164030', color: '#4ade80', borderRadius: 6, padding: '6px 12px', fontSize: 11, marginBottom: 12 }}>
+                                ✓ ATS analysis updated based on your latest edits
+                              </div>
+                            )}
 
                             {/* ── SECTION 1: 4 Score Cards ── */}
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
@@ -1936,10 +1963,17 @@ export default function Home() {
                             </div>
                             <div className="flex-shrink-0 px-5 py-4 border-t border-[var(--rz-border)] bg-[var(--rz-bg)]">
                               <div className="flex gap-2">
-                                <input type="text" value={agentInput} onChange={e => setAgentInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
-                                  placeholder="Edit resume or ask career questions..."
-                                  className="flex-1 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-[var(--rz-muted)] focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
-                                  disabled={!!agentLoading[activeJdTab]} />
+                                <textarea
+                                  value={agentInput}
+                                  onChange={e => { setAgentInput(e.target.value); e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = Math.min(e.currentTarget.scrollHeight, 120) + 'px'; }}
+                                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
+                                  onFocus={e => { e.currentTarget.style.borderColor = '#2563eb'; }}
+                                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--rz-border)'; }}
+                                  placeholder="Edit resume or ask questions... (Enter to send, Shift+Enter for new line)"
+                                  rows={1}
+                                  style={{ flex: 1, background: 'var(--rz-surface)', border: '1px solid var(--rz-border)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: 'inherit', minHeight: 44, maxHeight: 120, resize: 'none', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none', overflowY: 'auto', transition: 'border-color 0.15s' }}
+                                  disabled={!!agentLoading[activeJdTab]}
+                                />
                                 <button onClick={handleAgentSend} disabled={!agentInput.trim() || !!agentLoading[activeJdTab]}
                                   className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center text-[var(--rz-accent-text)] disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0">
                                   {agentLoading[activeJdTab] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
