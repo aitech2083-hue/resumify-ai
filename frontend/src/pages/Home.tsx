@@ -112,6 +112,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [jobTrackerStage, setJobTrackerStage] = useState<string | null>(null);
   const [generateStep, setGenerateStep] = useState(-1);
+  const [showHighDemandMsg, setShowHighDemandMsg] = useState(false);
   const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
 
   // -- RezAI Agent Chat State --
@@ -196,6 +197,15 @@ export default function Home() {
       setTimeout(() => setGenerateStep(3), 27000),
     ];
     return () => timers.forEach(clearTimeout);
+  }, [generateMut.isPending]);
+
+  // -- High-demand / rate-limit message --
+  // Shows after 25 s of generating — exactly when a backend retry would be in flight.
+  // Backend retries silently (no SSE); this gives users feedback without them seeing an error.
+  useEffect(() => {
+    if (!generateMut.isPending) { setShowHighDemandMsg(false); return; }
+    const t = setTimeout(() => setShowHighDemandMsg(true), 25000);
+    return () => clearTimeout(t);
   }, [generateMut.isPending]);
 
   // -- Handlers --
@@ -717,7 +727,13 @@ export default function Home() {
                           </div>
                         </div>
                         <h2 className="text-center font-bold text-lg text-foreground mb-1">RezAI is crafting your package...</h2>
-                        <p className="text-center text-sm text-[var(--rz-muted)] mb-8">This usually takes 30–45 seconds</p>
+                        {showHighDemandMsg ? (
+                          <p className="text-center text-sm text-amber-400 mb-8 flex items-center justify-center gap-1.5">
+                            <span>⏳</span> High demand right now — please wait a moment...
+                          </p>
+                        ) : (
+                          <p className="text-center text-sm text-[var(--rz-muted)] mb-8">This usually takes 30–45 seconds</p>
+                        )}
                         {/* Steps */}
                         <div className="space-y-3 max-w-xs mx-auto">
                           {GENERATE_STEPS.map((step, i) => (
@@ -1688,23 +1704,20 @@ export default function Home() {
                                 initialData={result.results[activeJdTab].resumeData as any ?? null}
                                 jd={jds[activeJdTab]}
                                 onDataChange={(updatedData: ResumeData) => {
-                                  // Keep result state fresh so re-mounting the editor
-                                  // always shows the user's last edited version
+                                  if (!updatedData) return;
+                                  // results is a JobResult[] array — update with index splice,
+                                  // never spread into an object (breaks .map / .length)
                                   setResult(prev => {
                                     if (!prev) return prev;
-                                    return {
-                                      ...prev,
-                                      results: {
-                                        ...prev.results,
-                                        [activeJdTab]: {
-                                          ...prev.results[activeJdTab],
-                                          resumeData: updatedData,
-                                        },
-                                      },
+                                    const newResults = [...prev.results];
+                                    newResults[activeJdTab] = {
+                                      ...newResults[activeJdTab],
+                                      resumeData: updatedData,
                                     };
+                                    return { ...prev, results: newResults };
                                   });
-                                  // Also keep editableLatex in sync so Preview/Download
-                                  // always uses the latest edited content
+                                  // Keep editableLatex in sync so Preview/Download
+                                  // always reflects the latest edited content
                                   const latestLatex = buildLatexFromData(updatedData);
                                   setEditableLatex(prev => ({ ...prev, [activeJdTab]: latestLatex }));
                                 }}
