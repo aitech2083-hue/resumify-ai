@@ -7,6 +7,7 @@ import { writeFile, readFile, rm, mkdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { sanitizeLatex } from "../utils/sanitizeLatex.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -271,23 +272,7 @@ function cleanMarkdown(text: string): string {
     .trim();
 }
 
-/** FIX 3: Last-line-of-defence — convert any residual markdown in LaTeX source
- *  to proper LaTeX commands before handing off to pdflatex.
- *  Only touches content lines — skips lines starting with \ or % (LaTeX syntax). */
-function sanitizeLatexMarkdown(latex: string): string {
-  return latex
-    .split("\n")
-    .map(line => {
-      const trimmed = line.trimStart();
-      if (trimmed === "" || trimmed.startsWith("\\") || trimmed.startsWith("%")) {
-        return line; // leave LaTeX / comment lines untouched
-      }
-      return line
-        .replace(/\*\*(.+?)\*\*/g, "\\textbf{$1}")
-        .replace(/\*(.+?)\*/g,     "\\textit{$1}");
-    })
-    .join("\n");
-}
+// sanitizeLatexMarkdown is now imported as sanitizeLatex from ../utils/sanitizeLatex
 
 function extractTag(text: string, tag: string): string {
   const m = text.match(new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, "i"));
@@ -844,7 +829,7 @@ router.post(
     } catch (err) {
       req.log.error({ err }, "Generation failed");
       res.status(500).json({
-        error: err instanceof Error ? err.message : "Generation failed.",
+        error: "Generation failed. Please try again.",
       });
     }
   },
@@ -869,7 +854,6 @@ router.post("/linkedin-import", async (req: Request, res: Response) => {
   }
 
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
-  console.log("APIFY_TOKEN present:", !!APIFY_TOKEN, "length:", APIFY_TOKEN?.length ?? 0);
   if (!APIFY_TOKEN) {
     res.status(500).json({ error: "Apify token not configured" });
     return;
@@ -1047,8 +1031,8 @@ router.post("/parse-latex", async (req: Request, res: Response) => {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.error("parse-latex: ANTHROPIC_API_KEY is not set");
-    res.status(500).json({ error: "API key not configured", details: "ANTHROPIC_API_KEY missing" });
+    req.log.error("parse-latex: ANTHROPIC_API_KEY is not set");
+    res.status(500).json({ error: "Service configuration error. Please try again later." });
     return;
   }
 
@@ -1150,8 +1134,8 @@ router.post("/regenerate-from-data", async (req: Request, res: Response) => {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.error("regenerate-from-data: ANTHROPIC_API_KEY is not set");
-    res.status(500).json({ error: "API key not configured", details: "ANTHROPIC_API_KEY missing" });
+    req.log.error("regenerate-from-data: ANTHROPIC_API_KEY is not set");
+    res.status(500).json({ error: "Service configuration error. Please try again later." });
     return;
   }
 
@@ -1368,8 +1352,8 @@ router.post(
 
     try {
       await mkdir(workDir, { recursive: true });
-      // FIX 3: sanitize any residual markdown before pdflatex sees it
-      await writeFile(texFile, sanitizeLatexMarkdown(latex), "utf-8");
+      // Sanitize any residual markdown before pdflatex sees it
+      await writeFile(texFile, sanitizeLatex(latex), "utf-8");
 
       // Single pdflatex pass — sufficient for plain resumes (no TOC/refs)
       try {

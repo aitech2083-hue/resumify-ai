@@ -2,37 +2,14 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { writeFile, readFile, rm, mkdir } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { sanitizeLatex } from "../utils/sanitizeLatex";
 
 const execFileAsync = promisify(execFile);
 const router: IRouter = Router();
-
-// Sanitize LaTeX before compilation: convert markdown and problematic Unicode
-function sanitizeForLatex(latex: string): string {
-  return latex
-    .replace(/\*\*(.+?)\*\*/g, "\\textbf{$1}")
-    .replace(/\*(.+?)\*/g,     "\\textit{$1}")
-    .replace(/`(.+?)`/g,       "\\texttt{$1}")
-    .replace(/[^\x00-\x7F]/g, (char) => {
-      const map: Record<string, string> = {
-        "\u2013": "--",
-        "\u2014": "---",
-        "\u2018": "'",
-        "\u2019": "'",
-        "\u201C": "``",
-        "\u201D": "''",
-        "\u2022": "\\textbullet{}",
-        "\u2026": "\\ldots{}",
-        "\u00AE": "\\textregistered{}",
-        "\u00A9": "\\textcopyright{}",
-        "\u2122": "\\texttrademark{}",
-      };
-      return map[char] ?? "";
-    });
-}
 
 // ── PDF compilation via pdflatex ──────────────────────────────────────────────
 router.post("/pdf", async (req: Request, res: Response) => {
@@ -49,7 +26,7 @@ router.post("/pdf", async (req: Request, res: Response) => {
 
   try {
     await mkdir(workDir, { recursive: true });
-    await writeFile(texFile, sanitizeForLatex(latex), "utf-8");
+    await writeFile(texFile, sanitizeLatex(latex), "utf-8");
 
     const pdflatexArgs = [
       "-interaction=nonstopmode",
@@ -70,6 +47,13 @@ router.post("/pdf", async (req: Request, res: Response) => {
     await execFileAsync("pdflatex", pdflatexArgs, { cwd: workDir, timeout: 30000 }).catch(() => {});
 
     if (!existsSync(pdfFile)) {
+      res.status(500).json({
+        error: "PDF generation failed. Please click Update Preview to refresh your resume and try downloading again.",
+      });
+      return;
+    }
+
+    if (statSync(pdfFile).size === 0) {
       res.status(500).json({
         error: "PDF generation failed. Please click Update Preview to refresh your resume and try downloading again.",
       });
