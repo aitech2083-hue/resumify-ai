@@ -240,6 +240,7 @@ export default function Home() {
 
   // -- Handlers --
   const handleGenerate = async () => {
+    if (generateMut.isPending) return; // prevent double-submit
     setErrorMsg(null);
     setResult(null);
     try {

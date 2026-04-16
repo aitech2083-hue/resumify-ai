@@ -369,39 +369,39 @@ export function ResumeEditor({ latex, initialData, jd, onSave, onDataChange }: R
   // ── State helpers ──────────────────────────────────────────────────────────
 
   const updExp = (id: string, field: keyof ExperienceEntry, value: string) =>
-    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, [field]: value } : e) }));
+    updateData(d => ({ ...d, experience: (d.experience ?? []).map(e => e.id === id ? { ...e, [field]: value } : e) }));
   const updExpBullet = (id: string, bi: number, v: string) =>
-    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.map((b, i) => i === bi ? v : b) } : e) }));
+    updateData(d => ({ ...d, experience: (d.experience ?? []).map(e => e.id === id ? { ...e, bullets: (e.bullets ?? []).map((b, i) => i === bi ? v : b) } : e) }));
   const addExpBullet = (id: string) =>
-    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: [...e.bullets, ""] } : e) }));
+    updateData(d => ({ ...d, experience: (d.experience ?? []).map(e => e.id === id ? { ...e, bullets: [...(e.bullets ?? []), ""] } : e) }));
   const removeExpBullet = (id: string, bi: number) =>
-    updateData(d => ({ ...d, experience: d.experience.map(e => e.id === id ? { ...e, bullets: e.bullets.filter((_, i) => i !== bi) } : e) }));
+    updateData(d => ({ ...d, experience: (d.experience ?? []).map(e => e.id === id ? { ...e, bullets: (e.bullets ?? []).filter((_, i) => i !== bi) } : e) }));
   const addExperience = () =>
-    updateData(d => ({ ...d, experience: [...d.experience, { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""], pageBreakBefore: false }] }));
+    updateData(d => ({ ...d, experience: [...(d.experience ?? []), { id: uuidv4(), title: "", company: "", location: "", startDate: "", endDate: "", bullets: [""], pageBreakBefore: false }] }));
   const removeExperience = (id: string) => {
     if (!confirm("Remove this experience entry?")) return;
-    updateData(d => ({ ...d, experience: d.experience.filter(e => e.id !== id) }));
+    updateData(d => ({ ...d, experience: (d.experience ?? []).filter(e => e.id !== id) }));
   };
   const updEdu = (id: string, field: keyof EducationEntry, v: string) =>
-    updateData(d => ({ ...d, education: d.education.map(e => e.id === id ? { ...e, [field]: v } : e) }));
+    updateData(d => ({ ...d, education: (d.education ?? []).map(e => e.id === id ? { ...e, [field]: v } : e) }));
   const addEducation = () =>
-    updateData(d => ({ ...d, education: [...d.education, { id: uuidv4(), degree: "", institution: "", year: "" }] }));
+    updateData(d => ({ ...d, education: [...(d.education ?? []), { id: uuidv4(), degree: "", institution: "", year: "" }] }));
   const removeEducation = (id: string) =>
-    updateData(d => ({ ...d, education: d.education.filter(e => e.id !== id) }));
+    updateData(d => ({ ...d, education: (d.education ?? []).filter(e => e.id !== id) }));
   const addSkill = () => {
     const s = skillInput.trim();
-    if (!s || data.skills.includes(s)) { setSkillInput(""); return; }
-    updateData(d => ({ ...d, skills: [...d.skills, s] }));
+    if (!s || (data.skills ?? []).includes(s)) { setSkillInput(""); return; }
+    updateData(d => ({ ...d, skills: [...(d.skills ?? []), s] }));
     setSkillInput("");
   };
-  const removeSkill = (s: string) => updateData(d => ({ ...d, skills: d.skills.filter(x => x !== s) }));
+  const removeSkill = (s: string) => updateData(d => ({ ...d, skills: (d.skills ?? []).filter(x => x !== s) }));
   const addCert = () => {
     const c = certInput.trim();
     if (!c) return;
-    updateData(d => ({ ...d, certifications: [...d.certifications, c] }));
+    updateData(d => ({ ...d, certifications: [...(d.certifications ?? []), c] }));
     setCertInput("");
   };
-  const removeCert = (i: number) => updateData(d => ({ ...d, certifications: d.certifications.filter((_, idx) => idx !== i) }));
+  const removeCert = (i: number) => updateData(d => ({ ...d, certifications: (d.certifications ?? []).filter((_, idx) => idx !== i) }));
 
   // ── Update Preview ─────────────────────────────────────────────────────────
 
