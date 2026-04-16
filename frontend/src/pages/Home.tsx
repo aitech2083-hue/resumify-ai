@@ -199,6 +199,9 @@ export default function Home() {
   const generateMut = useGenerateResume();
   const { history, saveHistory, deleteHistory, clearHistory } = useHistory();
 
+  // -- Derived: safe reference to the active tab's result (null if out of bounds) --
+  const activeResult = result?.results?.[activeJdTab] ?? null;
+
   // -- Template preview keyboard navigation --
   useEffect(() => {
     if (!showTemplatePreview) return;
@@ -237,6 +240,7 @@ export default function Home() {
 
   // -- Handlers --
   const handleGenerate = async () => {
+    if (generateMut.isPending) return; // prevent double-submit
     setErrorMsg(null);
     setResult(null);
     try {
@@ -265,8 +269,8 @@ export default function Home() {
         jds: [...jds],
         response: data
       });
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to generate materials. Please try again.");
+    } catch {
+      setErrorMsg("Something went wrong. Please try again.");
     }
   };
 
@@ -320,6 +324,15 @@ export default function Home() {
   };
 
   const loadHistoryItem = (item: any) => {
+    if (
+      !item ||
+      !item.response ||
+      !Array.isArray(item.response.results) ||
+      item.response.results.length === 0
+    ) {
+      console.warn("[RezAI] Invalid history item shape — skipping load");
+      return;
+    }
     setResult(item.response);
     setJds(item.jds);
     setActiveJdTab(0);
@@ -399,39 +412,49 @@ export default function Home() {
           }
           setPreviewLoading(prev => ({ ...prev, [tab]: false }));
         });
-        // Auto-recheck ATS after agent edits resume
+        // Auto-recheck ATS after agent edits resume (fail silently — stale score is acceptable)
         const jdText = jds[tab]?.text || "";
         if (jdText.length > 10) {
           setAtsRechecking(prev => ({ ...prev, [tab]: true }));
-          const baseUrl = import.meta.env.BASE_URL || "/";
-          fetch(`${baseUrl}api/resume/recheck-ats`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ latex: data.latex, jd: jdText }),
-          })
-            .then(r => r.json())
-            .then(recheckData => {
-              if (recheckData.success && result) {
-                setResult(prev => {
-                  if (!prev) return prev;
-                  const updated = [...prev.results];
-                  updated[tab] = {
-                    ...updated[tab],
-                    atsTailored: { ...updated[tab].atsTailored, score: recheckData.ats.score },
-                    matched_keywords: recheckData.ats.matched || updated[tab].matched_keywords,
-                    missing_keywords: recheckData.ats.missing || updated[tab].missing_keywords,
-                    healthScore: recheckData.ats.checks
-                      ? { overall: recheckData.ats.score, checks: recheckData.ats.checks }
-                      : updated[tab].healthScore,
-                  };
-                  return { ...prev, results: updated };
-                });
-                setAtsUpdated(prev => ({ ...prev, [tab]: true }));
-                setTimeout(() => setAtsUpdated(prev => ({ ...prev, [tab]: false })), 3000);
+          (async () => {
+            try {
+              const baseUrl = import.meta.env.BASE_URL || "/";
+              const recheckRes = await fetch(`${baseUrl}api/resume/recheck-ats`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ latex: data.latex, jd: jdText }),
+              });
+              if (!recheckRes.ok) {
+                console.warn("[RezAI] ATS recheck failed —", recheckRes.status);
+                return;
               }
-            })
-            .catch(() => {})
-            .finally(() => setAtsRechecking(prev => ({ ...prev, [tab]: false })));
+              const recheckData = await recheckRes.json();
+              if (!recheckData || !recheckData.success) {
+                console.warn("[RezAI] ATS recheck returned no data");
+                return;
+              }
+              setResult(prev => {
+                if (!prev) return prev;
+                const updated = [...prev.results];
+                updated[tab] = {
+                  ...updated[tab],
+                  atsTailored: { ...updated[tab].atsTailored, score: recheckData.ats.score },
+                  matched_keywords: recheckData.ats.matched || updated[tab].matched_keywords,
+                  missing_keywords: recheckData.ats.missing || updated[tab].missing_keywords,
+                  healthScore: recheckData.ats.checks
+                    ? { overall: recheckData.ats.score, checks: recheckData.ats.checks }
+                    : updated[tab].healthScore,
+                };
+                return { ...prev, results: updated };
+              });
+              setAtsUpdated(prev => ({ ...prev, [tab]: true }));
+              setTimeout(() => setAtsUpdated(prev => ({ ...prev, [tab]: false })), 3000);
+            } catch (err) {
+              console.warn("[RezAI] ATS recheck error:", err);
+            } finally {
+              setAtsRechecking(prev => ({ ...prev, [tab]: false }));
+            }
+          })();
         }
       }
       if (data.action) {
@@ -512,7 +535,7 @@ export default function Home() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
       URL.revokeObjectURL(url);
-    } catch (e: any) { alert(e.message || "PDF download failed."); }
+    } catch { alert("Download failed. Please try again."); }
     finally { setDownloadingPdf(false); }
   };
 
@@ -530,7 +553,7 @@ export default function Home() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
       URL.revokeObjectURL(url);
-    } catch (e: any) { alert(e.message || "Word download failed."); }
+    } catch { alert("Download failed. Please try again."); }
     finally { setDownloadingDocx(false); }
   };
 
@@ -1672,11 +1695,11 @@ export default function Home() {
                 )}
 
                 {/* Single JD: show company + title */}
-                {result.results.length === 1 && (
+                {result.results.length === 1 && activeResult && (
                   <div className="px-4 py-3 border-b border-[var(--rz-border)]">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--rz-muted)] block mb-0.5">Target Role</span>
-                    <div className="text-sm font-medium text-foreground">{result.results[0].jobTitle || jds[0]?.title || "—"}</div>
-                    <div className="text-xs text-[var(--rz-muted)]">{result.results[0].company || jds[0]?.company || "—"}</div>
+                    <div className="text-sm font-medium text-foreground">{activeResult.jobTitle || jds[0]?.title || "—"}</div>
+                    <div className="text-xs text-[var(--rz-muted)]">{activeResult.company || jds[0]?.company || "—"}</div>
                   </div>
                 )}
 
@@ -1893,7 +1916,7 @@ export default function Home() {
                               </div>
                               <div className="relative" ref={downloadMenuRef}>
                                 <div className="flex">
-                                  <button onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.pdf`)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-[var(--rz-accent-text)] rounded-l-lg text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                                  <button onClick={() => downloadPdf(editableLatex[activeJdTab] || activeResult?.latex || "", `resume-${activeResult?.company ?? "resume"}.pdf`)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-[var(--rz-accent-text)] rounded-l-lg text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50">
                                     {downloadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} PDF
                                   </button>
                                   <button onClick={() => setShowDownloadMenu(v => !v)} className="px-2 py-1.5 bg-primary/90 text-[var(--rz-accent-text)] rounded-r-lg border-l border-black/20 hover:bg-primary transition-colors">
@@ -1902,16 +1925,16 @@ export default function Home() {
                                 </div>
                                 {showDownloadMenu && (
                                   <div className="absolute right-0 top-full mt-1 z-50 w-40 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl shadow-xl overflow-hidden">
-                                    <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex, `resume-${result.results[activeJdTab].company}.docx`)} disabled={downloadingDocx} className="w-full flex items-center gap-2 px-4 py-3 text-xs text-foreground hover:bg-[#262626] transition-colors">
+                                    <button onClick={() => downloadDocx(editableLatex[activeJdTab] || activeResult?.latex || "", `resume-${activeResult?.company ?? "resume"}.docx`)} disabled={downloadingDocx} className="w-full flex items-center gap-2 px-4 py-3 text-xs text-foreground hover:bg-[#262626] transition-colors">
                                       {downloadingDocx ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Word (.docx)
                                     </button>
                                   </div>
                                 )}
                               </div>
-                              <a href={generateOverleafUrl(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-lg text-xs font-semibold hover:border-primary/40 transition-colors text-foreground">
+                              <a href={generateOverleafUrl(editableLatex[activeJdTab] || activeResult?.latex || "")} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-lg text-xs font-semibold hover:border-primary/40 transition-colors text-foreground">
                                 <ExternalLink className="w-3.5 h-3.5" /> Overleaf
                               </a>
-                              <CopyButton text={editableLatex[activeJdTab] || result.results[activeJdTab].latex} label="Copy LaTeX" />
+                              <CopyButton text={editableLatex[activeJdTab] || activeResult?.latex || ""} label="Copy LaTeX" />
                             </div>
                           </div>
                           <div className="flex-1 overflow-hidden rounded-xl border border-[var(--rz-border)]" style={{ minHeight: 0 }}>
@@ -1932,8 +1955,8 @@ export default function Home() {
                             ) : (
                               <ResumeEditor
                                 key={activeJdTab}
-                                latex={editableLatex[activeJdTab] ?? result.results[activeJdTab].latex ?? ""}
-                                initialData={result.results[activeJdTab].resumeData as any ?? null}
+                                latex={editableLatex[activeJdTab] ?? activeResult?.latex ?? ""}
+                                initialData={activeResult?.resumeData as any ?? null}
                                 jd={jds[activeJdTab]}
                                 onDataChange={(updatedData: ResumeData) => {
                                   if (!updatedData) return;
@@ -1969,11 +1992,17 @@ export default function Home() {
                                     if (!res.ok || !data.success || !data.pdf) {
                                       return { success: false, error: data.error || "Compilation failed." };
                                     }
-                                    // Decode base64 → Blob
-                                    const byteChars = atob(data.pdf);
-                                    const byteArr = new Uint8Array(byteChars.length);
-                                    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-                                    const blob = new Blob([byteArr], { type: "application/pdf" });
+                                    // Decode base64 → Blob (guard against malformed base64)
+                                    let blob: Blob;
+                                    try {
+                                      if (!data.pdf || data.pdf.length === 0) throw new Error("Empty PDF data");
+                                      const byteChars = atob(data.pdf);
+                                      const byteArr = new Uint8Array(byteChars.length);
+                                      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+                                      blob = new Blob([byteArr], { type: "application/pdf" });
+                                    } catch {
+                                      return { success: false, error: "Could not process PDF. Please try again." };
+                                    }
                                     setPreviewBlobs(prev => ({ ...prev, [activeJdTab]: blob }));
                                     setResumeViewMode("preview");
                                     return { success: true };
@@ -2213,9 +2242,9 @@ export default function Home() {
                       {/* ── COVER LETTER ── */}
                       {activeFeatureTab === "cover" && (
                         <div className="max-w-3xl mx-auto h-full flex flex-col">
-                          <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={result.results[activeJdTab].coverLetter} /></div>
+                          <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={activeResult?.coverLetter ?? ""} /></div>
                           <div className="flex-1 bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-8 overflow-auto shadow-sm">
-                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.results[activeJdTab].coverLetter}</p>
+                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{activeResult?.coverLetter ?? ""}</p>
                           </div>
                         </div>
                       )}
@@ -2223,9 +2252,9 @@ export default function Home() {
                       {/* ── OUTREACH EMAIL ── */}
                       {activeFeatureTab === "email" && (
                         <div className="max-w-3xl mx-auto h-full flex flex-col">
-                          <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={result.results[activeJdTab].email} /></div>
+                          <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={activeResult?.email ?? ""} /></div>
                           <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-8 shadow-sm">
-                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{result.results[activeJdTab].email}</p>
+                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{activeResult?.email ?? ""}</p>
                           </div>
                         </div>
                       )}
@@ -2261,7 +2290,7 @@ export default function Home() {
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-foreground">RezAI Agent</p>
-                                <p className="text-xs text-[var(--rz-muted)]">Resume for {result.results[activeJdTab].company}</p>
+                                <p className="text-xs text-[var(--rz-muted)]">Resume for {activeResult?.company ?? "—"}</p>
                               </div>
                             </div>
                             <div className="flex-1 overflow-hidden px-5 flex flex-col">
@@ -2302,10 +2331,10 @@ export default function Home() {
                               )}
                             </div>
                             <div className="flex-shrink-0 px-4 py-3 border-t border-[var(--rz-border)] flex gap-2">
-                              <button onClick={() => downloadPdf(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary/10 border border-primary/25 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors disabled:opacity-40">
+                              <button onClick={() => downloadPdf(editableLatex[activeJdTab] || activeResult?.latex || "")} disabled={downloadingPdf || !editableLatex[activeJdTab]} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary/10 border border-primary/25 text-primary rounded-lg text-xs font-bold hover:bg-primary/20 transition-colors disabled:opacity-40">
                                 {downloadingPdf ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} PDF
                               </button>
-                              <button onClick={() => downloadDocx(editableLatex[activeJdTab] || result.results[activeJdTab].latex)} disabled={downloadingDocx || !editableLatex[activeJdTab]} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[var(--rz-surface)] border border-[var(--rz-border)] text-[var(--rz-muted)] rounded-lg text-xs font-bold hover:text-foreground transition-colors disabled:opacity-40">
+                              <button onClick={() => downloadDocx(editableLatex[activeJdTab] || activeResult?.latex || "")} disabled={downloadingDocx || !editableLatex[activeJdTab]} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[var(--rz-surface)] border border-[var(--rz-border)] text-[var(--rz-muted)] rounded-lg text-xs font-bold hover:text-foreground transition-colors disabled:opacity-40">
                                 {downloadingDocx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} Word
                               </button>
                             </div>

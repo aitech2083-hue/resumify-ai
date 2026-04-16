@@ -43,7 +43,19 @@ export function escTex(s: string): string {
 
 // ─── Pure JS LaTeX builder — no API needed ────────────────────────────────────
 
-export function buildLatexFromData(d: ResumeData): string {
+export function buildLatexFromData(rawD: ResumeData): string {
+  if (!rawD) return "";
+
+  // Normalise: guarantee all array fields are proper arrays even if the caller
+  // passes a partially-formed object (e.g. from a history load or a failed parse).
+  const d: ResumeData = {
+    ...rawD,
+    experience:     Array.isArray(rawD.experience)     ? rawD.experience     : [],
+    education:      Array.isArray(rawD.education)      ? rawD.education      : [],
+    skills:         Array.isArray(rawD.skills)         ? rawD.skills         : [],
+    certifications: Array.isArray(rawD.certifications) ? rawD.certifications : [],
+  };
+
   const pi = d.personalInfo;
 
   const contactParts = [pi.location, pi.email, pi.phone, pi.linkedin]
