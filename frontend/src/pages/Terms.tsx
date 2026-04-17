@@ -1,0 +1,188 @@
+import { Link } from "wouter";
+import { Sparkles } from "lucide-react";
+
+// ── Shared mini-navbar ──────────────────────────────────────────────────────
+function Navbar() {
+  return (
+    <nav style={{
+      position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
+      background: "rgba(10,10,10,0.92)", backdropFilter: "blur(16px)",
+      borderBottom: "1px solid #1a1a1a",
+    }}>
+      <div style={{ maxWidth: 800, margin: "0 auto", padding: "0 24px", height: 60, display: "flex", alignItems: "center" }}>
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Sparkles size={16} color="#fff" />
+          </div>
+          <span style={{ fontSize: 20, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em" }}>
+            Rez<span style={{ color: "#2563eb" }}>AI</span>
+          </span>
+        </Link>
+      </div>
+    </nav>
+  );
+}
+
+function H2({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 style={{
+      fontSize: 18, fontWeight: 600, color: "#ffffff",
+      marginTop: 40, marginBottom: 12,
+      paddingBottom: 8, borderBottom: "1px solid #262626",
+    }}>
+      {children}
+    </h2>
+  );
+}
+
+function P({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ fontSize: 15, color: "#888888", lineHeight: 1.8, marginBottom: 16 }}>
+      {children}
+    </p>
+  );
+}
+
+function Li({ children }: { children: React.ReactNode }) {
+  return (
+    <li style={{ fontSize: 15, color: "#888888", lineHeight: 1.8, marginBottom: 6 }}>
+      {children}
+    </li>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
+export default function Terms() {
+  return (
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#ffffff" }}>
+      <Navbar />
+
+      <div style={{ maxWidth: 800, margin: "0 auto", padding: "100px 24px 80px" }}>
+
+        <h1 style={{ fontSize: 32, fontWeight: 700, color: "#ffffff", marginBottom: 8 }}>
+          Terms of Service
+        </h1>
+        <p style={{ fontSize: 13, color: "#555555", marginBottom: 40 }}>
+          Last updated: April 2026
+        </p>
+
+        <P>
+          Welcome to RezAI. By accessing or using rezai.in (the "Service"), you agree to be
+          bound by these Terms of Service ("Terms"). Please read them carefully before using
+          the Service.
+        </P>
+
+        {/* 1 */}
+        <H2>1. Acceptance of Terms</H2>
+        <P>
+          By creating an account or using RezAI in any way, you confirm that you have read,
+          understood, and agree to these Terms. If you do not agree, you may not use the Service.
+        </P>
+
+        {/* 2 */}
+        <H2>2. Use of Service</H2>
+        <P>RezAI is designed for personal job search and career development. You agree to:</P>
+        <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
+          <Li>Use the Service only for personal, non-commercial job search purposes</Li>
+          <Li>Not use the Service to generate spam, bulk outreach, or misleading content</Li>
+          <Li>Be at least 18 years of age</Li>
+          <Li>Maintain only one account per person</Li>
+          <Li>Provide accurate information when creating your account</Li>
+          <Li>Not attempt to reverse-engineer, scrape, or abuse the platform</Li>
+        </ul>
+
+        {/* 3 */}
+        <H2>3. Free and Pro Plans</H2>
+        <P>RezAI offers the following plans:</P>
+        <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
+          <Li><strong style={{ color: "#cccccc" }}>Free Plan</strong> — limited resume generations per month, access to core features</Li>
+          <Li><strong style={{ color: "#cccccc" }}>Pro Plan</strong> — ₹299/month, unlimited generations, priority processing, all features</Li>
+        </ul>
+        <P>
+          Pro Plan subscriptions are billed monthly. Payments are processed by Razorpay and
+          are non-refundable except where required by applicable law. You may cancel your
+          subscription at any time; access continues until the end of the billing period.
+        </P>
+
+        {/* 4 */}
+        <H2>4. Intellectual Property</H2>
+        <P>
+          Your resume content, work history, and personal information remain your property.
+          RezAI owns the platform, codebase, AI prompts, and underlying technology.
+        </P>
+        <P>
+          By using the Service, you grant RezAI a limited, non-exclusive license to process
+          your content solely to provide the Service — for example, to send your resume to
+          the AI for generation, or to store it in your history. We do not claim ownership
+          of your content.
+        </P>
+
+        {/* 5 */}
+        <H2>5. AI-Generated Content</H2>
+        <P>
+          Resumes, cover letters, and other content generated by RezAI are produced by
+          artificial intelligence and are provided for your personal use. You are responsible
+          for reviewing AI-generated content for accuracy before submitting it to employers.
+          RezAI does not guarantee that generated content is error-free or appropriate for
+          every situation.
+        </P>
+
+        {/* 6 */}
+        <H2>6. Limitation of Liability</H2>
+        <P>
+          RezAI is provided "as-is" without warranties of any kind. To the fullest extent
+          permitted by law:
+        </P>
+        <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
+          <Li>We do not guarantee that use of RezAI will result in job interviews or employment</Li>
+          <Li>We are not responsible for the accuracy of AI-generated resume content</Li>
+          <Li>We are not liable for any decisions made by employers based on your resume</Li>
+          <Li>Our maximum liability to you is limited to the amount you paid us in the 3 months preceding the claim</Li>
+        </ul>
+
+        {/* 7 */}
+        <H2>7. Termination</H2>
+        <P>
+          You may delete your account at any time from the app settings, which will permanently
+          remove your data. We reserve the right to suspend or terminate accounts that violate
+          these Terms, engage in abuse, or are inactive for extended periods. We will make
+          reasonable efforts to notify you before taking action.
+        </P>
+
+        {/* 8 */}
+        <H2>8. Changes to Terms</H2>
+        <P>
+          We may update these Terms from time to time. For significant changes, we will notify
+          users via email or an in-app notice. The updated "Last updated" date will always
+          reflect the most recent revision. Continued use of the Service after changes are
+          posted constitutes your acceptance of the revised Terms.
+        </P>
+
+        {/* 9 */}
+        <H2>9. Governing Law</H2>
+        <P>
+          These Terms are governed by the laws of India. Any disputes arising from or related
+          to these Terms or the Service shall be subject to the exclusive jurisdiction of the
+          courts in New Delhi, India.
+        </P>
+
+        {/* 10 */}
+        <H2>10. Contact Us</H2>
+        <P>
+          If you have questions about these Terms or need to report an issue, please reach out:
+        </P>
+        <ul style={{ paddingLeft: 20, marginBottom: 16 }}>
+          <Li>Email: support@rezai.in</Li>
+          <Li>Website: <a href="https://rezai.in" style={{ color: "#2563eb", textDecoration: "none" }}>rezai.in</a></Li>
+        </ul>
+
+        {/* Back link */}
+        <div style={{ marginTop: 60, paddingTop: 24, borderTop: "1px solid #1a1a1a" }}>
+          <Link href="/" style={{ color: "#2563eb", fontSize: 14, textDecoration: "none" }}>
+            ← Back to RezAI
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

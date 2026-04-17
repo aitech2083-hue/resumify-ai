@@ -512,10 +512,10 @@ function Footer() {
         </div>
 
         <p className="text-[var(--rz-text)]/30 text-sm text-center">
-          &copy; {new Date().getFullYear()} RezAI. Built with Claude AI.
+          &copy; {new Date().getFullYear()} RezAI · Built for Indian job seekers
         </p>
 
-        <div className="flex items-center gap-6 text-sm text-[var(--rz-text)]/40">
+        <div className="flex items-center gap-6 text-sm text-[var(--rz-text)]/40 flex-wrap justify-center">
           <Link href="/app" className="hover:text-[var(--rz-accent)] transition-colors">
             Launch App
           </Link>
@@ -525,6 +525,12 @@ function Footer() {
           >
             Features
           </a>
+          <Link href="/privacy" className="hover:text-[var(--rz-text)] transition-colors">
+            Privacy Policy
+          </Link>
+          <Link href="/terms" className="hover:text-[var(--rz-text)] transition-colors">
+            Terms of Service
+          </Link>
         </div>
       </div>
     </footer>
