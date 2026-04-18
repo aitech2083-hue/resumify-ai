@@ -74,6 +74,21 @@ export interface JobFit {
   gaps: JobFitGap[];
 }
 
+export interface AtsBreakdown {
+  skills_match: number;
+  experience_match: number;
+  title_match: number;
+  top_keywords: string[];
+  missing_keywords: string[];
+  verdict: string;
+}
+
+export interface QuickWins {
+  rewritten_headline: string;
+  rewritten_summary: string;
+  top_3_changes: string[];
+}
+
 export interface ResumePersonalInfo {
   name: string;
   email: string;
@@ -123,6 +138,8 @@ export interface JobResult {
   healthScore: HealthScore | null;
   jobFit: JobFit | null;
   resumeData: ResumeData | null;
+  atsBreakdown?: AtsBreakdown | null;
+  quickWins?: QuickWins | null;
 }
 
 export interface LinkedInContent {
