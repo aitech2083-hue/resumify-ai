@@ -95,6 +95,21 @@ interface JobFit {
   gaps: JobFitGap[];
 }
 
+interface AtsBreakdown {
+  skills_match: number;
+  experience_match: number;
+  title_match: number;
+  top_keywords: string[];
+  missing_keywords: string[];
+  verdict: string;
+}
+
+interface QuickWins {
+  rewritten_headline: string;
+  rewritten_summary: string;
+  top_3_changes: string[];
+}
+
 interface JobResult {
   jdIndex: number;
   company: string;
@@ -109,6 +124,8 @@ interface JobResult {
   healthScore: HealthScore | null;
   jobFit: JobFit | null;
   resumeData: Record<string, unknown> | null;
+  atsBreakdown: AtsBreakdown | null;
+  quickWins: QuickWins | null;
 }
 
 interface LinkedInContent {
@@ -465,6 +482,8 @@ async function generateResumeAndATS(
   healthScore: HealthScore | null;
   jobFit: JobFit | null;
   resumeData: Record<string, unknown> | null;
+  atsBreakdown: AtsBreakdown | null;
+  quickWins: QuickWins | null;
 }> {
   const preambleExample = [
     String.raw`\documentclass[11pt]{article}`,
@@ -497,6 +516,8 @@ async function generateResumeAndATS(
     "<KEYWORDS_MISSING> ... </KEYWORDS_MISSING>",
     "<HEALTH_SCORE> ... </HEALTH_SCORE>",
     "<JOB_FIT> ... </JOB_FIT>",
+    "<ATS_BREAKDOWN> ... </ATS_BREAKDOWN>",
+    "<QUICK_WINS> ... </QUICK_WINS>",
     "<RESUME_DATA> ... </RESUME_DATA>",
     "The <RESUME_DATA> tag is CRITICAL — it must contain a complete, valid JSON object with ALL fields populated.",
     "NEVER omit <RESUME_DATA>. NEVER return null or empty for personalInfo.name. Extract the candidate's full name from the resume.",
@@ -518,6 +539,15 @@ async function generateResumeAndATS(
     "• Identify the top 10 most critical keywords the employer needs",
     "• Plan to include each important keyword at least 4-6 times naturally across the resume",
     "• Understand the seniority level, industry, and company culture from the JD before writing",
+    "",
+    "━━━ ATS SCORING RULES (IMPORTANT — read before scoring) ━━━",
+    "Do NOT default to a middle value. Be honest and varied in your scoring:",
+    "• Poor keyword match (0–4 of 10 keywords) = score 20–45",
+    "• Moderate keyword match (5–6 of 10 keywords) = score 46–70",
+    "• Strong keyword match (7–8 of 10 keywords) = score 71–85",
+    "• Excellent keyword match (9–10 of 10 keywords) = score 86–95",
+    "Base the ATS score primarily on: (1) keyword hit rate, (2) experience level match, (3) job title alignment.",
+    "Count exactly how many of the top 10 JD keywords appear in the resume — use that count as the primary score driver.",
     "",
     "━━━ STEP 3: SKILL MATCHING RULES ━━━",
     "• If candidate has a similar skill to what JD requires — replace with the JD keyword (e.g. Tableau → Power BI)",
@@ -584,6 +614,12 @@ async function generateResumeAndATS(
     "<JOB_FIT>",
     `{"grade":"[A+/A/B+/B/C+/C]","score":[1.0-5.0],"verdict":"[one-line verdict]","shouldApply":[true/false],"dimensions":[{"name":"Role Match","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Skills Match","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Seniority Fit","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Salary Range","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Work Mode","score":[0-100],"label":"[Excellent/Strong/Good/Fair/Weak]"},{"name":"Interview Probability","score":[0-100],"label":"[High/Moderate/Low]"}],"gaps":[{"skill":"[skill name]","severity":"[High/Medium/Low]","fix":"[one-line actionable fix]"}]}`,
     "</JOB_FIT>",
+    "<ATS_BREAKDOWN>",
+    `{"skills_match":[integer 0-100],"experience_match":[integer 0-100],"title_match":[integer 0-100],"top_keywords":["[kw1]","[kw2]","[kw3]"],"missing_keywords":["[kw1]","[kw2]"],"verdict":"[one sentence verdict, e.g. Strong match — apply with minor keyword additions]"}`,
+    "</ATS_BREAKDOWN>",
+    "<QUICK_WINS>",
+    `{"rewritten_headline":"[improved headline tailored to this JD, e.g. Senior Business Analyst with 5+ years in E-commerce Analytics]","rewritten_summary":"[2-3 sentence professional summary rewritten specifically for this JD and candidate]","top_3_changes":["[specific actionable change 1]","[specific actionable change 2]","[specific actionable change 3]"]}`,
+    "</QUICK_WINS>",
     "<RESUME_DATA>",
     `{"personalInfo":{"name":"[full name]","email":"[email]","phone":"[phone]","location":"[city, country]","linkedin":"[linkedin url or empty]"},"summary":"[professional summary text]","experience":[{"id":"exp1","title":"[job title]","company":"[company]","location":"[city]","startDate":"[MMM YYYY]","endDate":"[MMM YYYY or Present]","bullets":["[bullet 1]","[bullet 2]"],"pageBreakBefore":false}],"education":[{"id":"edu1","degree":"[degree]","institution":"[school]","year":"[YYYY]"}],"skills":["[skill1]","[skill2]"],"certifications":["[cert1]"]}`,
     "</RESUME_DATA>",
@@ -612,6 +648,8 @@ async function generateResumeAndATS(
   const healthScore = parseJsonTag("HEALTH_SCORE");
   const jobFit = parseJsonTag("JOB_FIT");
   const resumeData = parseJsonTag("RESUME_DATA");
+  const atsBreakdown = parseJsonTag("ATS_BREAKDOWN");
+  const quickWins = parseJsonTag("QUICK_WINS");
 
   return {
     latex,
@@ -623,6 +661,8 @@ async function generateResumeAndATS(
     jobFit: jobFit ?? null,
     // Always non-null: use parsed tag or fallback extractor so Edit Resume never calls parse-latex
     resumeData: resumeData ?? buildResumeDataFromLatex(latex),
+    atsBreakdown: atsBreakdown ?? null,
+    quickWins: quickWins ?? null,
   };
 }
 

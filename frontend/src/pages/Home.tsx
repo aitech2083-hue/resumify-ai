@@ -2025,6 +2025,8 @@ export default function Home() {
                         const missing = r.missing_keywords ?? [];
                         const hs = r.healthScore;
                         const jf = r.jobFit;
+                        const ab = r.atsBreakdown ?? null;
+                        const qw = r.quickWins ?? null;
                         const hasNewData = hs !== null && hs !== undefined && jf !== null && jf !== undefined;
 
                         if (!hasNewData) {
@@ -2205,7 +2207,7 @@ export default function Home() {
 
                             {/* ── SECTION 3: Keywords Full Width ── */}
                             {(matched.length > 0 || missing.length > 0) && (
-                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 16 }}>
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 16, marginBottom: 12 }}>
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                   <div>
                                     <div style={{ fontSize: 10, color: "#4ade80", marginBottom: 8, fontWeight: 600 }}>Keywords found</div>
@@ -2232,6 +2234,90 @@ export default function Home() {
                                     )}
                                   </div>
                                 </div>
+                              </div>
+                            )}
+
+                            {/* ── SECTION 4: ATS 3-Dimension Breakdown ── */}
+                            {ab && (
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                                <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>ATS MATCH BREAKDOWN</div>
+                                {([
+                                  { label: "Skills Match",      value: ab.skills_match },
+                                  { label: "Experience Match",  value: ab.experience_match },
+                                  { label: "Title Match",       value: ab.title_match },
+                                ] as { label: string; value: number }[]).map(({ label, value }) => {
+                                  const bc = value >= 80 ? "#4ade80" : value >= 60 ? "#60a5fa" : "#fbbf24";
+                                  return (
+                                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                                      <span style={{ fontSize: 11, color: "#aaaaaa", width: 130, flexShrink: 0 }}>{label}</span>
+                                      <div style={{ flex: 1, height: 6, background: "#1e1e1e", borderRadius: 3, overflow: "hidden" }}>
+                                        <motion.div
+                                          initial={{ width: 0 }}
+                                          animate={{ width: `${value}%` }}
+                                          transition={{ duration: 0.9, ease: "easeOut" }}
+                                          style={{ height: "100%", background: bc, borderRadius: 3 }}
+                                        />
+                                      </div>
+                                      <span style={{ fontSize: 11, fontWeight: 600, color: bc, width: 34, textAlign: "right", flexShrink: 0 }}>{value}%</span>
+                                    </div>
+                                  );
+                                })}
+                                {ab.verdict && (
+                                  <div style={{ marginTop: 10, padding: "7px 12px", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 7, fontSize: 11, color: "#aaaaaa", fontStyle: "italic" }}>
+                                    {ab.verdict}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* ── SECTION 5: Quick Wins ── */}
+                            {qw && (
+                              <div style={{ background: "#141414", border: "1px solid #262626", borderRadius: 10, padding: 16 }}>
+                                <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>QUICK WINS FOR THIS ROLE</div>
+
+                                {/* Rewritten Headline */}
+                                {qw.rewritten_headline && (
+                                  <div style={{ marginBottom: 14 }}>
+                                    <div style={{ fontSize: 10, color: "#888888", marginBottom: 6, fontWeight: 600 }}>Rewritten Headline</div>
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, padding: "10px 12px" }}>
+                                      <span style={{ fontSize: 12, color: "#ffffff", flex: 1, lineHeight: 1.5 }}>"{qw.rewritten_headline}"</span>
+                                      <CopyButton text={qw.rewritten_headline} minimal />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Rewritten Summary */}
+                                {qw.rewritten_summary && (
+                                  <div style={{ marginBottom: 14 }}>
+                                    <div style={{ fontSize: 10, color: "#888888", marginBottom: 6, fontWeight: 600 }}>Rewritten Summary</div>
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8, background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 8, padding: "10px 12px" }}>
+                                      <span style={{ fontSize: 12, color: "#cccccc", flex: 1, lineHeight: 1.6 }}>{qw.rewritten_summary}</span>
+                                      <CopyButton text={qw.rewritten_summary} minimal />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Top 3 Changes */}
+                                {Array.isArray(qw.top_3_changes) && qw.top_3_changes.length > 0 && (
+                                  <div>
+                                    <div style={{ fontSize: 10, color: "#888888", marginBottom: 8, fontWeight: 600 }}>Top 3 Changes</div>
+                                    {qw.top_3_changes.map((change, i) => (
+                                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+                                        <span style={{ color: "#2563eb", fontSize: 12, flexShrink: 0, marginTop: 1 }}>→</span>
+                                        <span style={{ fontSize: 12, color: "#aaaaaa", lineHeight: 1.5 }}>{change}</span>
+                                      </div>
+                                    ))}
+                                    <button
+                                      onClick={() => {
+                                        setActiveFeatureTab("agent");
+                                        setTimeout(() => setAgentInput(`Please apply all these quick wins to my resume:\n${qw.top_3_changes.map((c, i) => `${i + 1}. ${c}`).join("\n")}`), 100);
+                                      }}
+                                      style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.25)", color: "#2563eb", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                                    >
+                                      ⚡ Apply all with Agent
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
 
