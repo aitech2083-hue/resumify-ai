@@ -1429,6 +1429,240 @@ router.post(
   },
 );
 
+// ── Find Referrals ────────────────────────────────────────────────────────────
+function parseDurationToMonths(duration: string | null | undefined): number {
+  if (!duration) return 0;
+  const yrMatch = duration.match(/(\d+)\s*yr/);
+  const moMatch = duration.match(/(\d+)\s*mo/);
+  const years = yrMatch ? parseInt(yrMatch[1]) : 0;
+  const months = moMatch ? parseInt(moMatch[1]) : 0;
+  return years * 12 + months;
+}
+
+router.post("/find-referrals", async (req: Request, res: Response) => {
+  const { companyName, jobTitle, location } = req.body as {
+    companyName?: string;
+    jobTitle?: string;
+    location?: string;
+  };
+
+  if (!companyName || !jobTitle) {
+    res.status(400).json({ error: "Company name and job title required" });
+    return;
+  }
+
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  if (!APIFY_TOKEN) {
+    res.status(500).json({ error: "Service configuration error" });
+    return;
+  }
+
+  try {
+    const searchQuery = `${jobTitle} ${companyName}`;
+
+    const response = await fetch(
+      `https://api.apify.com/v2/acts/harvestapi~linkedin-profile-search/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          searchQuery,
+          location: location || "India",
+          maxItems: 25,
+          scrapeType: "Full ($0.10 per search page + $0.004 per profile)",
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Apify error:", response.status, errText);
+      res.status(502).json({ error: "Could not search for referrals right now" });
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any[] = await response.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      res.json({ success: true, people: [], totalFound: 0, message: "No referrals found for this company" });
+      return;
+    }
+
+    const targetCity = (location || "").toLowerCase();
+    const targetCompany = companyName.toLowerCase();
+
+    const people = data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((item: any) => {
+        const currentCompany = (item.currentPosition?.[0]?.companyName || "").toLowerCase();
+        if (
+          !currentCompany.includes(targetCompany) &&
+          !targetCompany.includes(currentCompany)
+        ) return false;
+
+        const duration = item.currentPosition?.[0]?.duration;
+        const startYear = item.currentPosition?.[0]?.startDate?.year;
+        let months = parseDurationToMonths(duration);
+        if (months === 0 && startYear) {
+          months = (new Date().getFullYear() - startYear) * 12;
+        }
+        if (months < 12) return false;
+
+        if (targetCity) {
+          const city = (item.location?.parsed?.city || "").toLowerCase();
+          const state = (item.location?.parsed?.state || "").toLowerCase();
+          const fullText = (item.location?.linkedinText || "").toLowerCase();
+          const cityMatch =
+            city.includes(targetCity) ||
+            state.includes(targetCity) ||
+            fullText.includes(targetCity);
+          if (!cityMatch) return false;
+        }
+
+        if (!item.linkedinUrl) return false;
+        return true;
+      })
+      .slice(0, 10)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((item: any, idx: number) => {
+        const duration = item.currentPosition?.[0]?.duration;
+        const startYear = item.currentPosition?.[0]?.startDate?.year;
+        let displayDuration: string | null = duration || null;
+        if (!displayDuration && startYear) {
+          const years = new Date().getFullYear() - startYear;
+          displayDuration = years === 1 ? "1 yr" : `${years} yrs`;
+        }
+
+        const topSkillsRaw: string = item.topSkills || "";
+        const skills = topSkillsRaw
+          .split(" • ")
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+          .slice(0, 3);
+
+        const title =
+          item.currentPosition?.[0]?.position ||
+          item.headline?.split("/")?.[0]?.trim() ||
+          item.headline?.split("|")?.[0]?.trim() ||
+          item.headline ||
+          "";
+
+        return {
+          id: idx + 1,
+          name: ((item.firstName || "") + " " + (item.lastName || "")).trim(),
+          title,
+          company: item.currentPosition?.[0]?.companyName || companyName,
+          duration: displayDuration,
+          city: item.location?.parsed?.city || "",
+          state: item.location?.parsed?.state || "",
+          country: item.location?.parsed?.country || "",
+          photo: item.photo || null,
+          companyLogo:
+            item.currentPosition?.[0]?.companyLogo?.sizes?.[1]?.url || null,
+          linkedinUrl: item.linkedinUrl,
+          skills,
+          email: null,
+        };
+      });
+
+    res.json({
+      success: true,
+      company: companyName,
+      role: jobTitle,
+      people,
+      totalFound: people.length,
+    });
+  } catch (error: unknown) {
+    console.error(
+      "Find referrals error:",
+      error instanceof Error ? error.message : String(error),
+    );
+    res
+      .status(500)
+      .json({ error: "Could not find referrals. Please try again." });
+  }
+});
+
+// ── Draft Referral Message ────────────────────────────────────────────────────
+router.post("/draft-referral-message", async (req: Request, res: Response) => {
+  const {
+    personName,
+    personTitle,
+    companyName,
+    jobTitle,
+    candidateName,
+    candidateSummary,
+    candidateSkills = [],
+  } = req.body as {
+    personName?: string;
+    personTitle?: string;
+    companyName?: string;
+    jobTitle?: string;
+    candidateName?: string;
+    candidateSummary?: string;
+    candidateSkills?: string[];
+  };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: "Service configuration error" });
+    return;
+  }
+
+  try {
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 200,
+        messages: [
+          {
+            role: "user",
+            content: `Write a LinkedIn connection request message.
+
+STRICT RULES:
+- Under 300 characters TOTAL
+- Warm and professional
+- Mention their name and company
+- Mention one specific skill or background
+- End with a question
+- No emojis
+- Return ONLY the message, nothing else
+
+From: ${candidateName || "the candidate"}
+To: ${personName || "the contact"} (${personTitle || "Employee"} at ${companyName || "the company"})
+Applying for: ${jobTitle || "a position"}
+My background: ${(candidateSummary || "").substring(0, 200)}
+My top skills: ${(candidateSkills || []).slice(0, 3).join(", ")}`,
+          },
+        ],
+      }),
+    });
+
+    const aiData = (await aiResponse.json()) as {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    let message = aiData.content?.[0]?.text?.trim() || "";
+    if (message.length > 300) message = message.substring(0, 297) + "...";
+
+    res.json({ success: true, message, characterCount: message.length });
+  } catch (error: unknown) {
+    console.error(
+      "Draft referral message error:",
+      error instanceof Error ? error.message : String(error),
+    );
+    res
+      .status(500)
+      .json({ error: "Could not draft message. Please try again." });
+  }
+});
+
 // ── Quick ATS recheck (post-agent-edit) ──────────────────────────────────────
 router.post("/recheck-ats", async (req: Request, res: Response) => {
   const { latex, jd } = req.body as { latex?: string; jd?: string };

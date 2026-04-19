@@ -5,13 +5,13 @@ import {
   Zap, Trash2, Plus, X,
   ChevronLeft, ChevronRight, Copy, Check, FileCode2, Pencil,
   Briefcase, GraduationCap, LayoutTemplate,
-  History, Eye, ExternalLink, Mail, MessageSquare,
+  History, Eye, ExternalLink, Users, MessageSquare,
   Download, Loader2, ChevronDown, Upload,
   RefreshCw, BookOpen, Sun, Moon
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { cn, copyToClipboard, generateOverleafUrl } from "@/lib/utils";
-import type { Mode, JD, ScratchData, GenerateResponse, AtsScore, ResumeData } from "@/types";
+import type { Mode, JD, ScratchData, GenerateResponse, AtsScore, ResumeData, ReferralPerson, ReferralState } from "@/types";
 import { useGenerateResume } from "@/hooks/use-generate";
 import { useHistory } from "@/hooks/use-history";
 
@@ -146,6 +146,15 @@ export default function Home() {
   const agentBottomRef = useRef<HTMLDivElement>(null);
   const agentBubbleBottomRef = useRef<HTMLDivElement>(null);
 
+  // -- Referral Engine State --
+  const [referralData, setReferralData] = useState<Record<number, ReferralState>>({});
+  const [expandedPerson, setExpandedPerson] = useState<number | null>(null);
+  const [personMessages, setPersonMessages] = useState<Record<string, string>>({});
+  const [messageLoading, setMessageLoading] = useState<Record<string, boolean>>({});
+  const [messageCopied, setMessageCopied] = useState<Record<string, boolean>>({});
+  // Company field validation errors (keyed by JD index)
+  const [jdCompanyErrors, setJdCompanyErrors] = useState<Record<number, boolean>>({});
+
   // -- Draggable bubble state --
   const BUBBLE_MARGIN = 20;
   const BUBBLE_SIZE = 56; // w-14 h-14
@@ -241,6 +250,22 @@ export default function Home() {
   // -- Handlers --
   const handleGenerate = async () => {
     if (generateMut.isPending) return; // prevent double-submit
+
+    // Validate that all JDs have a company name
+    const companyErrors: Record<number, boolean> = {};
+    let hasCompanyErrors = false;
+    jds.forEach((jd, i) => {
+      if (!jd.company?.trim()) {
+        companyErrors[i] = true;
+        hasCompanyErrors = true;
+      }
+    });
+    if (hasCompanyErrors) {
+      setJdCompanyErrors(companyErrors);
+      return;
+    }
+    setJdCompanyErrors({});
+
     setErrorMsg(null);
     setResult(null);
     try {
@@ -489,6 +514,89 @@ export default function Home() {
     setTimeout(() => sendAgentMessage(instruction), 80);
   };
 
+  // ── Referral Engine ──────────────────────────────────────────────────────────
+
+  const fetchReferrals = async (tabIdx: number) => {
+    const r = result?.results?.[tabIdx];
+    if (!r) return;
+    const company = r.company || jds[tabIdx]?.company || "";
+    const role = r.jobTitle || jds[tabIdx]?.title || "";
+    if (!company || !role) return;
+
+    setReferralData(prev => ({
+      ...prev,
+      [tabIdx]: { people: [], loading: true, error: null, searched: false },
+    }));
+
+    try {
+      const baseUrl = import.meta.env.BASE_URL || "/";
+      const res = await fetch(`${baseUrl}api/resume/find-referrals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName: company, jobTitle: role, location: "" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReferralData(prev => ({
+          ...prev,
+          [tabIdx]: { people: [], loading: false, error: data.error || "Search failed", searched: true },
+        }));
+        return;
+      }
+      setReferralData(prev => ({
+        ...prev,
+        [tabIdx]: { people: data.people || [], loading: false, error: null, searched: true },
+      }));
+    } catch {
+      setReferralData(prev => ({
+        ...prev,
+        [tabIdx]: { people: [], loading: false, error: "Could not find referrals. Try again.", searched: true },
+      }));
+    }
+  };
+
+  const handleDraftMessage = async (person: ReferralPerson) => {
+    const key = `${activeJdTab}_${person.id}`;
+    if (messageLoading[key]) return;
+    setMessageLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const baseUrl = import.meta.env.BASE_URL || "/";
+      const rd = activeResult?.resumeData as ResumeData | null;
+      const res = await fetch(`${baseUrl}api/resume/draft-referral-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          personName: person.name,
+          personTitle: person.title,
+          companyName: person.company,
+          jobTitle: result?.results?.[activeJdTab]?.jobTitle || "",
+          candidateName: rd?.personalInfo?.name || "",
+          candidateSummary: rd?.summary || "",
+          candidateSkills: rd?.skills?.slice(0, 5) || [],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPersonMessages(prev => ({ ...prev, [key]: data.message }));
+        setExpandedPerson(person.id);
+      }
+    } catch (err) {
+      console.error("Draft message error:", err);
+    } finally {
+      setMessageLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleTabChange = (newTab: string) => {
+    setActiveFeatureTab(newTab);
+    if (newTab === "referrals") {
+      const existing = referralData[activeJdTab];
+      if (!existing?.searched && !existing?.loading) {
+        fetchReferrals(activeJdTab);
+      }
+    }
+  };
+
   // Auto-compile all JDs when result arrives.
   // IMPORTANT: result also changes on every user edit (onDataChange updates resumeData).
   // We must only do the full reset/compile when the LATEX changed (new generation or
@@ -650,8 +758,8 @@ export default function Home() {
     { id: "resume", label: "Resume", icon: FileText as ComponentType<{ className?: string }> },
     { id: "ats", label: "ATS Analysis", icon: Sparkles as ComponentType<{ className?: string }> },
     { id: "cover", label: "Cover Letter", icon: BookOpen as ComponentType<{ className?: string }> },
-    { id: "email", label: "Outreach", icon: Mail as ComponentType<{ className?: string }> },
     { id: "linkedin", label: "LinkedIn", icon: MessageSquare as ComponentType<{ className?: string }> },
+    { id: "referrals", label: "🤝 Referrals", icon: Users as ComponentType<{ className?: string }> },
     { id: "agent", label: "RezAI Agent", icon: Zap as ComponentType<{ className?: string }> },
   ];
 
@@ -1213,11 +1321,21 @@ export default function Home() {
                                   value={jds[0]?.title || ""} onChange={e => { const n = [...jds]; n[0].title = e.target.value; setJds(n); }}
                                   className="card-input"
                                 />
-                                <input
-                                  type="text" placeholder="Company name (optional)"
-                                  value={jds[0]?.company || ""} onChange={e => { const n = [...jds]; n[0].company = e.target.value; setJds(n); }}
-                                  className="card-input"
-                                />
+                                <div>
+                                  <input
+                                    type="text" placeholder="Company name *"
+                                    value={jds[0]?.company || ""}
+                                    onChange={e => {
+                                      const n = [...jds]; n[0].company = e.target.value; setJds(n);
+                                      if (e.target.value.trim()) setJdCompanyErrors(prev => ({ ...prev, 0: false }));
+                                    }}
+                                    className="card-input"
+                                    style={jdCompanyErrors[0] ? { borderColor: '#ef4444', outline: 'none' } : {}}
+                                  />
+                                  {jdCompanyErrors[0] && (
+                                    <p style={{ color: '#ef4444', fontSize: 10, marginTop: 3 }}>Company name is required</p>
+                                  )}
+                                </div>
                               </div>
                               <textarea
                                 placeholder="Paste the full job description here..."
@@ -1248,7 +1366,21 @@ export default function Home() {
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
                                 <input type="text" placeholder="Job Title (optional)" value={jds[activeInputJdIndex]?.title || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].title = e.target.value; setJds(n); }} className="card-input" />
-                                <input type="text" placeholder="Company name (optional)" value={jds[activeInputJdIndex]?.company || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].company = e.target.value; setJds(n); }} className="card-input" />
+                                <div>
+                                  <input
+                                    type="text" placeholder="Company name *"
+                                    value={jds[activeInputJdIndex]?.company || ""}
+                                    onChange={e => {
+                                      const n = [...jds]; n[activeInputJdIndex].company = e.target.value; setJds(n);
+                                      if (e.target.value.trim()) setJdCompanyErrors(prev => ({ ...prev, [activeInputJdIndex]: false }));
+                                    }}
+                                    className="card-input"
+                                    style={jdCompanyErrors[activeInputJdIndex] ? { borderColor: '#ef4444', outline: 'none' } : {}}
+                                  />
+                                  {jdCompanyErrors[activeInputJdIndex] && (
+                                    <p style={{ color: '#ef4444', fontSize: 10, marginTop: 3 }}>Company name is required</p>
+                                  )}
+                                </div>
                               </div>
                               <textarea placeholder="Paste job description here..." value={jds[activeInputJdIndex]?.text || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].text = e.target.value; setJds(n); }} className="card-textarea min-h-[120px]" />
                               {jds.length > 1 && (
@@ -1850,7 +1982,7 @@ export default function Home() {
                   {featureTabs.map(tab => (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveFeatureTab(tab.id)}
+                      onClick={() => handleTabChange(tab.id)}
                       className={cn(
                         "relative px-3 h-full flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap transition-colors",
                         activeFeatureTab === tab.id ? "text-primary" : "text-[var(--rz-muted)] hover:text-foreground"
@@ -1937,6 +2069,46 @@ export default function Home() {
                               <CopyButton text={editableLatex[activeJdTab] || activeResult?.latex || ""} label="Copy LaTeX" />
                             </div>
                           </div>
+                          {/* Referral hint card — shown when company is known */}
+                          {(activeResult?.company || jds[activeJdTab]?.company) && (
+                            <div style={{
+                              background: '#0d1a2e',
+                              border: '1px solid #1e3a5f',
+                              borderRadius: 10,
+                              padding: '12px 16px',
+                              marginBottom: 10,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexShrink: 0,
+                            }}>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#ffffff' }}>
+                                  🤝 Find Referrals at {activeResult?.company || jds[activeJdTab]?.company}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>
+                                  Referrals get 5x more interview callbacks
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleTabChange('referrals')}
+                                style={{
+                                  background: '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  padding: '6px 14px',
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                Find Referrals →
+                              </button>
+                            </div>
+                          )}
+
                           <div className="flex-1 overflow-hidden rounded-xl border border-[var(--rz-border)]" style={{ minHeight: 0 }}>
                             {resumeViewMode === "preview" ? (
                               previewLoading[activeJdTab] ? (
@@ -2335,15 +2507,213 @@ export default function Home() {
                         </div>
                       )}
 
-                      {/* ── OUTREACH EMAIL ── */}
-                      {activeFeatureTab === "email" && (
-                        <div className="max-w-3xl mx-auto h-full flex flex-col">
-                          <div className="flex justify-end mb-4 flex-shrink-0"><CopyButton text={activeResult?.email ?? ""} /></div>
-                          <div className="bg-[var(--rz-surface)] border border-[var(--rz-border)] rounded-xl p-8 shadow-sm">
-                            <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed text-[15px]">{activeResult?.email ?? ""}</p>
+                      {/* ── REFERRALS ── */}
+                      {activeFeatureTab === "referrals" && (() => {
+                        const refState = referralData[activeJdTab];
+                        const r = activeResult;
+                        const companyForRef = r?.company || jds[activeJdTab]?.company || "";
+                        const jobTitleForRef = r?.jobTitle || jds[activeJdTab]?.title || "";
+
+                        // Loading state
+                        if (!refState || refState.loading) {
+                          return (
+                            <div style={{ maxWidth: 700, margin: "0 auto" }}>
+                              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                                <p style={{ fontSize: 13, color: "#aaaaaa" }}>
+                                  Finding referrals at {companyForRef}...
+                                </p>
+                                <p style={{ fontSize: 11, color: "#666666", marginTop: 4 }}>This takes 15–30 seconds</p>
+                              </div>
+                              {[1, 2, 3].map(i => (
+                                <div key={i} style={{ background: "#0a0a0a", border: "1px solid #1e1e1e", borderRadius: 8, padding: 12, marginBottom: 8, display: "flex", gap: 12, alignItems: "center" }}>
+                                  <div className="animate-pulse" style={{ width: 40, height: 40, borderRadius: "50%", background: "#1e1e1e", flexShrink: 0 }} />
+                                  <div style={{ flex: 1 }}>
+                                    <div className="animate-pulse" style={{ height: 12, background: "#1e1e1e", borderRadius: 4, marginBottom: 6, width: "60%" }} />
+                                    <div className="animate-pulse" style={{ height: 10, background: "#1e1e1e", borderRadius: 4, width: "40%" }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+
+                        // Error state
+                        if (refState.error) {
+                          return (
+                            <div style={{ maxWidth: 700, margin: "0 auto", textAlign: "center", padding: "40px 0" }}>
+                              <div style={{ fontSize: 13, color: "#f87171", marginBottom: 16 }}>{refState.error}</div>
+                              <button
+                                onClick={() => fetchReferrals(activeJdTab)}
+                                style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                              >
+                                Retry
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        // Empty state
+                        if (refState.searched && refState.people.length === 0) {
+                          return (
+                            <div style={{ maxWidth: 700, margin: "0 auto", textAlign: "center", padding: "40px 0" }}>
+                              <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
+                              <div style={{ fontSize: 14, fontWeight: 600, color: "#ffffff", marginBottom: 8 }}>No referrals found</div>
+                              <div style={{ fontSize: 12, color: "#666666", marginBottom: 24 }}>
+                                No referrals found at {companyForRef} for this role.<br />
+                                Try searching on LinkedIn directly:
+                              </div>
+                              <a
+                                href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(jobTitleForRef + " " + companyForRef)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ background: "#0a66c2", color: "#ffffff", textDecoration: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, display: "inline-block" }}
+                              >
+                                🔗 Search on LinkedIn
+                              </a>
+                            </div>
+                          );
+                        }
+
+                        // PRO: people found
+                        const parseDur = (dur: string | null): number => {
+                          if (!dur) return 0;
+                          const yr = dur.match(/(\d+)\s*yr/)?.[1];
+                          const mo = dur.match(/(\d+)\s*mo/)?.[1];
+                          return (yr ? parseInt(yr) * 12 : 0) + (mo ? parseInt(mo) : 0);
+                        };
+                        const seniorCount = refState.people.filter(p => parseDur(p.duration) >= 24).length;
+                        const midCount = refState.people.filter(p => { const m = parseDur(p.duration); return m >= 12 && m < 24; }).length;
+
+                        return (
+                          <div style={{ maxWidth: 700, margin: "0 auto" }}>
+                            {/* Stats row */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+                              {([
+                                { label: "People Found", value: refState.people.length },
+                                { label: "Senior 2+ yrs", value: seniorCount },
+                                { label: "Mid 1-2 yrs", value: midCount },
+                              ] as { label: string; value: number }[]).map(s => (
+                                <div key={s.label} style={{ background: "#141414", border: "1px solid #262626", borderRadius: 8, padding: "10px 14px", textAlign: "center" }}>
+                                  <div style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", fontFamily: "monospace" }}>{s.value}</div>
+                                  <div style={{ fontSize: 9, color: "#666666", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 2 }}>{s.label}</div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Person cards */}
+                            {refState.people.map(person => {
+                              const key = `${activeJdTab}_${person.id}`;
+                              const isExpanded = expandedPerson === person.id;
+                              const msg = personMessages[key] || "";
+                              const isLoading = messageLoading[key] || false;
+                              const isCopied = messageCopied[key] || false;
+                              const initials = person.name.split(" ").map(n => n[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+
+                              return (
+                                <div
+                                  key={person.id}
+                                  style={{ background: "#0a0a0a", border: "1px solid #1e1e1e", borderRadius: 8, padding: 12, marginBottom: 8, cursor: "default", transition: "border-color 0.15s" }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "#2563eb"; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "#1e1e1e"; }}
+                                >
+                                  {/* Top row */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                    {/* Avatar */}
+                                    {person.photo ? (
+                                      <img src={person.photo} alt={person.name} style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                    ) : (
+                                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#1e3a5f", color: "#60a5fa", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                                        {initials}
+                                      </div>
+                                    )}
+
+                                    {/* Name / Title / Location */}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: "#ffffff" }}>{person.name || "—"}</span>
+                                        {person.duration && (
+                                          <span style={{ background: "#0d2818", border: "1px solid #164030", color: "#4ade80", borderRadius: 10, padding: "2px 8px", fontSize: 9, fontWeight: 500 }}>
+                                            {person.duration}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{ fontSize: 11, color: "#888888" }}>{person.title || person.company}</div>
+                                      {(person.city || person.state) && (
+                                        <div style={{ fontSize: 10, color: "#555555", marginTop: 1 }}>
+                                          {[person.city, person.state].filter(Boolean).join(", ")}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Action buttons */}
+                                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                      <button
+                                        onClick={() => handleDraftMessage(person)}
+                                        disabled={isLoading}
+                                        style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, opacity: isLoading ? 0.7 : 1 }}
+                                      >
+                                        {isLoading ? (
+                                          <><Loader2 style={{ width: 10, height: 10 }} className="animate-spin" /> Drafting...</>
+                                        ) : (
+                                          "Draft Message"
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={() => window.open(person.linkedinUrl, "_blank")}
+                                        style={{ background: "transparent", border: "1px solid #333333", color: "#888888", borderRadius: 6, padding: "5px 10px", fontSize: 10, cursor: "pointer" }}
+                                      >
+                                        ↗ LinkedIn
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Skills chips */}
+                                  {person.skills.length > 0 && (
+                                    <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+                                      {person.skills.map(skill => (
+                                        <span key={skill} style={{ background: "#141414", border: "1px solid #333333", color: "#888888", borderRadius: 10, padding: "2px 6px", fontSize: 9 }}>
+                                          {skill}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Message panel */}
+                                  {isExpanded && msg && (
+                                    <div style={{ background: "#141414", borderTop: "1px solid #1e1e1e", padding: 12, marginTop: 8, borderRadius: "0 0 8px 8px" }}>
+                                      <p style={{ fontSize: 11, color: "#cccccc", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 8 }}>{msg}</p>
+                                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                                        <span style={{ fontSize: 10, color: msg.length <= 300 ? "#4ade80" : "#f87171", fontWeight: 600 }}>
+                                          {msg.length}/300 {msg.length <= 300 ? "✓ LinkedIn ready" : "⚠ Too long"}
+                                        </span>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                          <button
+                                            onClick={() => {
+                                              copyToClipboard(msg);
+                                              setMessageCopied(prev => ({ ...prev, [key]: true }));
+                                              setTimeout(() => setMessageCopied(prev => ({ ...prev, [key]: false })), 2000);
+                                            }}
+                                            style={{ background: isCopied ? "#0d2818" : "#141414", border: "1px solid #333333", color: isCopied ? "#4ade80" : "#888888", borderRadius: 6, padding: "4px 10px", fontSize: 10, cursor: "pointer" }}
+                                          >
+                                            {isCopied ? "✓ Copied!" : "📋 Copy"}
+                                          </button>
+                                          <button
+                                            onClick={() => handleDraftMessage(person)}
+                                            disabled={isLoading}
+                                            style={{ background: "#141414", border: "1px solid #333333", color: "#888888", borderRadius: 6, padding: "4px 10px", fontSize: 10, cursor: "pointer" }}
+                                          >
+                                            {isLoading ? "Regenerating..." : "✨ Regenerate"}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* ── LINKEDIN ── */}
                       {activeFeatureTab === "linkedin" && (
