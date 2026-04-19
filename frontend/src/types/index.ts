@@ -89,6 +89,29 @@ export interface QuickWins {
   top_3_changes: string[];
 }
 
+export interface ReferralPerson {
+  id: number;
+  name: string;
+  title: string;
+  company: string;
+  duration: string | null;
+  city: string;
+  state: string;
+  country: string;
+  photo: string | null;
+  companyLogo: string | null;
+  linkedinUrl: string;
+  skills: string[];
+  email: null;
+}
+
+export interface ReferralState {
+  people: ReferralPerson[];
+  loading: boolean;
+  error: string | null;
+  searched: boolean;
+}
+
 export interface ResumePersonalInfo {
   name: string;
   email: string;
