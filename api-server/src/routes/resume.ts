@@ -1440,14 +1440,19 @@ function parseDurationToMonths(duration: string | null | undefined): number {
 }
 
 router.post("/find-referrals", async (req: Request, res: Response) => {
-  const { companyName, jobTitle, location } = req.body as {
+  const { companyLinkedinUrl, companyName, jobTitle } = req.body as {
+    companyLinkedinUrl?: string;
     companyName?: string;
     jobTitle?: string;
-    location?: string;
   };
 
   if (!companyName || !jobTitle) {
     res.status(400).json({ error: "Company name and job title required" });
+    return;
+  }
+
+  if (!companyLinkedinUrl || !companyLinkedinUrl.trim()) {
+    res.status(400).json({ error: "no_url" });
     return;
   }
 
@@ -1458,19 +1463,22 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
   }
 
   try {
-    const searchQuery = `${jobTitle} ${companyName}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const apifyInput: any = {
+      companies: [companyLinkedinUrl.trim()],
+      yearsAtCurrentCompany: ["2", "3", "4", "5"],
+      maxItems: 15,
+      profileScraperMode: "Full ($8 per 1k)",
+      companyBatchMode: "all_at_once",
+      recentlyChangedJobs: false,
+    };
 
     const response = await fetch(
-      `https://api.apify.com/v2/acts/harvestapi~linkedin-profile-search/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=60`,
+      `https://api.apify.com/v2/acts/harvestapi~linkedin-company-employees/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=90`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          searchQuery,
-          location: location || "India",
-          maxItems: 25,
-          scrapeType: "Full ($0.10 per search page + $0.004 per profile)",
-        }),
+        body: JSON.stringify(apifyInput),
       },
     );
 
@@ -1489,45 +1497,24 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
       return;
     }
 
-    const targetCity = (location || "").toLowerCase();
-    const targetCompany = companyName.toLowerCase();
-
     const people = data
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .filter((item: any) => {
-        const currentCompany = (item.currentPosition?.[0]?.companyName || "").toLowerCase();
-        if (
-          !currentCompany.includes(targetCompany) &&
-          !targetCompany.includes(currentCompany)
-        ) return false;
-
-        const duration = item.currentPosition?.[0]?.duration;
-        const startYear = item.currentPosition?.[0]?.startDate?.year;
+        if (!item.linkedinUrl) return false;
+        const duration = item.experience?.[0]?.duration;
+        const startYear = item.experience?.[0]?.startDate?.year;
         let months = parseDurationToMonths(duration);
         if (months === 0 && startYear) {
           months = (new Date().getFullYear() - startYear) * 12;
         }
         if (months < 12) return false;
-
-        if (targetCity) {
-          const city = (item.location?.parsed?.city || "").toLowerCase();
-          const state = (item.location?.parsed?.state || "").toLowerCase();
-          const fullText = (item.location?.linkedinText || "").toLowerCase();
-          const cityMatch =
-            city.includes(targetCity) ||
-            state.includes(targetCity) ||
-            fullText.includes(targetCity);
-          if (!cityMatch) return false;
-        }
-
-        if (!item.linkedinUrl) return false;
         return true;
       })
       .slice(0, 10)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((item: any, idx: number) => {
-        const duration = item.currentPosition?.[0]?.duration;
-        const startYear = item.currentPosition?.[0]?.startDate?.year;
+        const duration = item.experience?.[0]?.duration;
+        const startYear = item.experience?.[0]?.startDate?.year;
         let displayDuration: string | null = duration || null;
         if (!displayDuration && startYear) {
           const years = new Date().getFullYear() - startYear;
@@ -1542,7 +1529,7 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
           .slice(0, 3);
 
         const title =
-          item.currentPosition?.[0]?.position ||
+          item.experience?.[0]?.position ||
           item.headline?.split("/")?.[0]?.trim() ||
           item.headline?.split("|")?.[0]?.trim() ||
           item.headline ||
@@ -1552,14 +1539,11 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
           id: idx + 1,
           name: ((item.firstName || "") + " " + (item.lastName || "")).trim(),
           title,
-          company: item.currentPosition?.[0]?.companyName || companyName,
+          company: item.experience?.[0]?.companyName || companyName,
           duration: displayDuration,
           city: item.location?.parsed?.city || "",
-          state: item.location?.parsed?.state || "",
           country: item.location?.parsed?.country || "",
           photo: item.photo || null,
-          companyLogo:
-            item.currentPosition?.[0]?.companyLogo?.sizes?.[1]?.url || null,
           linkedinUrl: item.linkedinUrl,
           skills,
           email: null,
@@ -1604,6 +1588,11 @@ router.post("/draft-referral-message", async (req: Request, res: Response) => {
     candidateSkills?: string[];
   };
 
+  if (!personName || !companyName || !jobTitle) {
+    res.status(400).json({ error: "personName, companyName, and jobTitle are required" });
+    return;
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     res.status(500).json({ error: "Service configuration error" });
@@ -1619,7 +1608,7 @@ router.post("/draft-referral-message", async (req: Request, res: Response) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 200,
         messages: [
           {
@@ -1636,8 +1625,8 @@ STRICT RULES:
 - Return ONLY the message, nothing else
 
 From: ${candidateName || "the candidate"}
-To: ${personName || "the contact"} (${personTitle || "Employee"} at ${companyName || "the company"})
-Applying for: ${jobTitle || "a position"}
+To: ${personName} (${personTitle || "Employee"} at ${companyName})
+Applying for: ${jobTitle}
 My background: ${(candidateSummary || "").substring(0, 200)}
 My top skills: ${(candidateSkills || []).slice(0, 3).join(", ")}`,
           },
@@ -1645,10 +1634,21 @@ My top skills: ${(candidateSkills || []).slice(0, 3).join(", ")}`,
       }),
     });
 
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error("Claude API error:", aiResponse.status, errText);
+      res.status(502).json({ error: "AI service unavailable. Please try again." });
+      return;
+    }
+
     const aiData = (await aiResponse.json()) as {
       content?: Array<{ type: string; text?: string }>;
     };
     let message = aiData.content?.[0]?.text?.trim() || "";
+    if (!message) {
+      res.status(502).json({ error: "AI returned an empty response. Please try again." });
+      return;
+    }
     if (message.length > 300) message = message.substring(0, 297) + "...";
 
     res.json({ success: true, message, characterCount: message.length });
@@ -1658,7 +1658,7 @@ My top skills: ${(candidateSkills || []).slice(0, 3).join(", ")}`,
       error instanceof Error ? error.message : String(error),
     );
     res
-      .status(500)
+      .status(502)
       .json({ error: "Could not draft message. Please try again." });
   }
 });

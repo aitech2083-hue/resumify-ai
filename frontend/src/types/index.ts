@@ -96,16 +96,14 @@ export interface ReferralPerson {
   company: string;
   duration: string | null;
   city: string;
-  state: string;
   country: string;
   photo: string | null;
-  companyLogo: string | null;
   linkedinUrl: string;
   skills: string[];
   email: null;
 }
 
-export interface ReferralState {
+export interface ReferralTabState {
   people: ReferralPerson[];
   loading: boolean;
   error: string | null;

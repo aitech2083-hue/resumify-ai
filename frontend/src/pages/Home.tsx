@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { cn, copyToClipboard, generateOverleafUrl } from "@/lib/utils";
-import type { Mode, JD, ScratchData, GenerateResponse, AtsScore, ResumeData, ReferralPerson, ReferralState } from "@/types";
+import type { Mode, JD, ScratchData, GenerateResponse, AtsScore, ResumeData, ReferralPerson, ReferralTabState } from "@/types";
 import { useGenerateResume } from "@/hooks/use-generate";
 import { useHistory } from "@/hooks/use-history";
 
@@ -147,11 +147,12 @@ export default function Home() {
   const agentBubbleBottomRef = useRef<HTMLDivElement>(null);
 
   // -- Referral Engine State --
-  const [referralData, setReferralData] = useState<Record<number, ReferralState>>({});
-  const [expandedPerson, setExpandedPerson] = useState<number | null>(null);
-  const [personMessages, setPersonMessages] = useState<Record<string, string>>({});
-  const [messageLoading, setMessageLoading] = useState<Record<string, boolean>>({});
-  const [messageCopied, setMessageCopied] = useState<Record<string, boolean>>({});
+  const [companyLinkedinUrl, setCompanyLinkedinUrl] = useState('');
+  const [referralData, setReferralData] = useState<Record<number, ReferralTabState>>({});
+  const [expandedReferral, setExpandedReferral] = useState<number | null>(null);
+  const [referralMessages, setReferralMessages] = useState<Record<string, string>>({});
+  const [referralMsgLoading, setReferralMsgLoading] = useState<Record<string, boolean>>({});
+  const [referralMsgCopied, setReferralMsgCopied] = useState<Record<string, boolean>>({});
   // Company field validation errors (keyed by JD index)
   const [jdCompanyErrors, setJdCompanyErrors] = useState<Record<number, boolean>>({});
 
@@ -523,6 +524,15 @@ export default function Home() {
     const role = r.jobTitle || jds[tabIdx]?.title || "";
     if (!company || !role) return;
 
+    // If no LinkedIn URL, set no_url error immediately without hitting the API
+    if (!companyLinkedinUrl.trim()) {
+      setReferralData(prev => ({
+        ...prev,
+        [tabIdx]: { people: [], loading: false, error: "no_url", searched: true },
+      }));
+      return;
+    }
+
     setReferralData(prev => ({
       ...prev,
       [tabIdx]: { people: [], loading: true, error: null, searched: false },
@@ -533,7 +543,7 @@ export default function Home() {
       const res = await fetch(`${baseUrl}api/resume/find-referrals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName: company, jobTitle: role, location: "" }),
+        body: JSON.stringify({ companyLinkedinUrl: companyLinkedinUrl.trim(), companyName: company, jobTitle: role }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -555,13 +565,13 @@ export default function Home() {
     }
   };
 
-  const handleDraftMessage = async (person: ReferralPerson) => {
-    const key = `${activeJdTab}_${person.id}`;
-    if (messageLoading[key]) return;
-    setMessageLoading(prev => ({ ...prev, [key]: true }));
+  const handleDraftReferralMessage = async (person: ReferralPerson, tabIdx: number) => {
+    const key = `${tabIdx}_${person.id}`;
+    if (referralMsgLoading[key]) return;
+    setReferralMsgLoading(prev => ({ ...prev, [key]: true }));
     try {
       const baseUrl = import.meta.env.BASE_URL || "/";
-      const rd = activeResult?.resumeData as ResumeData | null;
+      const rd = result?.results?.[tabIdx]?.resumeData as ResumeData | null;
       const res = await fetch(`${baseUrl}api/resume/draft-referral-message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -569,7 +579,7 @@ export default function Home() {
           personName: person.name,
           personTitle: person.title,
           companyName: person.company,
-          jobTitle: result?.results?.[activeJdTab]?.jobTitle || "",
+          jobTitle: result?.results?.[tabIdx]?.jobTitle || "",
           candidateName: rd?.personalInfo?.name || "",
           candidateSummary: rd?.summary || "",
           candidateSkills: rd?.skills?.slice(0, 5) || [],
@@ -577,13 +587,13 @@ export default function Home() {
       });
       const data = await res.json();
       if (data.success) {
-        setPersonMessages(prev => ({ ...prev, [key]: data.message }));
-        setExpandedPerson(person.id);
+        setReferralMessages(prev => ({ ...prev, [key]: data.message }));
+        setExpandedReferral(person.id);
       }
     } catch (err) {
-      console.error("Draft message error:", err);
+      console.error("Draft referral message error:", err);
     } finally {
-      setMessageLoading(prev => ({ ...prev, [key]: false }));
+      setReferralMsgLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -1337,6 +1347,13 @@ export default function Home() {
                                   )}
                                 </div>
                               </div>
+                              <input
+                                type="url"
+                                placeholder="Company LinkedIn URL (for Referrals tab, optional)"
+                                value={companyLinkedinUrl}
+                                onChange={e => setCompanyLinkedinUrl(e.target.value)}
+                                className="card-input text-xs"
+                              />
                               <textarea
                                 placeholder="Paste the full job description here..."
                                 value={jds[0]?.text || ""} onChange={e => { const n = [...jds]; n[0].text = e.target.value; setJds(n); }}
@@ -1382,6 +1399,13 @@ export default function Home() {
                                   )}
                                 </div>
                               </div>
+                              <input
+                                type="url"
+                                placeholder="Company LinkedIn URL (for Referrals tab, optional)"
+                                value={companyLinkedinUrl}
+                                onChange={e => setCompanyLinkedinUrl(e.target.value)}
+                                className="card-input text-xs"
+                              />
                               <textarea placeholder="Paste job description here..." value={jds[activeInputJdIndex]?.text || ""} onChange={e => { const n = [...jds]; n[activeInputJdIndex].text = e.target.value; setJds(n); }} className="card-textarea min-h-[120px]" />
                               {jds.length > 1 && (
                                 <button onClick={() => { const n = jds.filter((_, i) => i !== activeInputJdIndex); setJds(n); setActiveInputJdIndex(Math.max(0, activeInputJdIndex - 1)); }} className="text-xs text-[var(--rz-muted)] hover:text-destructive flex items-center gap-1">
@@ -2513,23 +2537,38 @@ export default function Home() {
                         const r = activeResult;
                         const companyForRef = r?.company || jds[activeJdTab]?.company || "";
                         const jobTitleForRef = r?.jobTitle || jds[activeJdTab]?.title || "";
+                        const isPro = true; // TODO: wire to real auth when billing is added
+
+                        // Shimmer keyframes injected once
+                        const shimmerStyle = `
+                          @keyframes rzShimmer {
+                            0% { background-position: -400px 0; }
+                            100% { background-position: 400px 0; }
+                          }
+                          .rz-shimmer {
+                            background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+                            background-size: 800px 100%;
+                            animation: rzShimmer 1.4s infinite linear;
+                          }
+                        `;
 
                         // Loading state
                         if (!refState || refState.loading) {
                           return (
                             <div style={{ maxWidth: 700, margin: "0 auto" }}>
+                              <style>{shimmerStyle}</style>
                               <div style={{ textAlign: "center", marginBottom: 20 }}>
                                 <p style={{ fontSize: 13, color: "#aaaaaa" }}>
                                   Finding referrals at {companyForRef}...
                                 </p>
-                                <p style={{ fontSize: 11, color: "#666666", marginTop: 4 }}>This takes 15–30 seconds</p>
+                                <p style={{ fontSize: 11, color: "#666666", marginTop: 4 }}>This takes 30–60 seconds</p>
                               </div>
                               {[1, 2, 3].map(i => (
                                 <div key={i} style={{ background: "#0a0a0a", border: "1px solid #1e1e1e", borderRadius: 8, padding: 12, marginBottom: 8, display: "flex", gap: 12, alignItems: "center" }}>
-                                  <div className="animate-pulse" style={{ width: 40, height: 40, borderRadius: "50%", background: "#1e1e1e", flexShrink: 0 }} />
+                                  <div className="rz-shimmer" style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0 }} />
                                   <div style={{ flex: 1 }}>
-                                    <div className="animate-pulse" style={{ height: 12, background: "#1e1e1e", borderRadius: 4, marginBottom: 6, width: "60%" }} />
-                                    <div className="animate-pulse" style={{ height: 10, background: "#1e1e1e", borderRadius: 4, width: "40%" }} />
+                                    <div className="rz-shimmer" style={{ height: 12, borderRadius: 4, marginBottom: 6, width: "60%" }} />
+                                    <div className="rz-shimmer" style={{ height: 10, borderRadius: 4, width: "40%" }} />
                                   </div>
                                 </div>
                               ))}
@@ -2537,7 +2576,30 @@ export default function Home() {
                           );
                         }
 
-                        // Error state
+                        // no_url state — prompt user to add LinkedIn URL
+                        if (refState.error === "no_url") {
+                          return (
+                            <div style={{ maxWidth: 700, margin: "0 auto", textAlign: "center", padding: "48px 24px" }}>
+                              <div style={{ fontSize: 36, marginBottom: 12 }}>🔗</div>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: "#ffffff", marginBottom: 8 }}>Add Company LinkedIn URL</div>
+                              <div style={{ fontSize: 12, color: "#666666", marginBottom: 24, lineHeight: 1.7 }}>
+                                To find referrals, paste the company's LinkedIn page URL in the<br />
+                                <span style={{ color: "#aaaaaa" }}>Job Description</span> section above (e.g. <span style={{ color: "#60a5fa" }}>linkedin.com/company/google</span>).
+                              </div>
+                              <button
+                                onClick={() => {
+                                  // scroll to the JD input
+                                  document.querySelector<HTMLInputElement>('input[type="url"]')?.focus();
+                                }}
+                                style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                              >
+                                ↑ Add LinkedIn URL above
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        // Generic error state
                         if (refState.error) {
                           return (
                             <div style={{ maxWidth: 700, margin: "0 auto", textAlign: "center", padding: "40px 0" }}>
@@ -2559,7 +2621,7 @@ export default function Home() {
                               <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
                               <div style={{ fontSize: 14, fontWeight: 600, color: "#ffffff", marginBottom: 8 }}>No referrals found</div>
                               <div style={{ fontSize: 12, color: "#666666", marginBottom: 24 }}>
-                                No referrals found at {companyForRef} for this role.<br />
+                                No employees found at {companyForRef} for this role.<br />
                                 Try searching on LinkedIn directly:
                               </div>
                               <a
@@ -2574,7 +2636,7 @@ export default function Home() {
                           );
                         }
 
-                        // PRO: people found
+                        // People found
                         const parseDur = (dur: string | null): number => {
                           if (!dur) return 0;
                           const yr = dur.match(/(\d+)\s*yr/)?.[1];
@@ -2585,7 +2647,21 @@ export default function Home() {
                         const midCount = refState.people.filter(p => { const m = parseDur(p.duration); return m >= 12 && m < 24; }).length;
 
                         return (
-                          <div style={{ maxWidth: 700, margin: "0 auto" }}>
+                          <div style={{ maxWidth: 700, margin: "0 auto", position: "relative" }}>
+                            {/* isPro lock overlay */}
+                            {!isPro && (
+                              <div style={{ position: "absolute", inset: 0, zIndex: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 12, backdropFilter: "blur(6px)", background: "rgba(0,0,0,0.55)" }}>
+                                <div style={{ background: "#141414", border: "1px solid #2563eb", borderRadius: 12, padding: "28px 36px", textAlign: "center", maxWidth: 320 }}>
+                                  <div style={{ fontSize: 28, marginBottom: 10 }}>🔒</div>
+                                  <div style={{ fontSize: 15, fontWeight: 700, color: "#ffffff", marginBottom: 6 }}>Pro Feature</div>
+                                  <div style={{ fontSize: 12, color: "#888888", marginBottom: 18, lineHeight: 1.6 }}>Upgrade to Pro to unlock the Referral Engine and find warm introductions at your target companies.</div>
+                                  <button style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: 8, padding: "9px 22px", fontSize: 12, fontWeight: 700, cursor: "pointer", width: "100%" }}>
+                                    Upgrade to Pro →
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Stats row */}
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
                               {([
@@ -2603,10 +2679,10 @@ export default function Home() {
                             {/* Person cards */}
                             {refState.people.map(person => {
                               const key = `${activeJdTab}_${person.id}`;
-                              const isExpanded = expandedPerson === person.id;
-                              const msg = personMessages[key] || "";
-                              const isLoading = messageLoading[key] || false;
-                              const isCopied = messageCopied[key] || false;
+                              const isExpanded = expandedReferral === person.id;
+                              const msg = referralMessages[key] || "";
+                              const isLoading = referralMsgLoading[key] || false;
+                              const isCopied = referralMsgCopied[key] || false;
                               const initials = person.name.split(" ").map(n => n[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
                               return (
@@ -2638,9 +2714,9 @@ export default function Home() {
                                         )}
                                       </div>
                                       <div style={{ fontSize: 11, color: "#888888" }}>{person.title || person.company}</div>
-                                      {(person.city || person.state) && (
+                                      {(person.city || person.country) && (
                                         <div style={{ fontSize: 10, color: "#555555", marginTop: 1 }}>
-                                          {[person.city, person.state].filter(Boolean).join(", ")}
+                                          {[person.city, person.country].filter(Boolean).join(", ")}
                                         </div>
                                       )}
                                     </div>
@@ -2648,7 +2724,7 @@ export default function Home() {
                                     {/* Action buttons */}
                                     <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                                       <button
-                                        onClick={() => handleDraftMessage(person)}
+                                        onClick={() => handleDraftReferralMessage(person, activeJdTab)}
                                         disabled={isLoading}
                                         style={{ background: "#2563eb", color: "#ffffff", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 10, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, opacity: isLoading ? 0.7 : 1 }}
                                       >
@@ -2690,15 +2766,15 @@ export default function Home() {
                                           <button
                                             onClick={() => {
                                               copyToClipboard(msg);
-                                              setMessageCopied(prev => ({ ...prev, [key]: true }));
-                                              setTimeout(() => setMessageCopied(prev => ({ ...prev, [key]: false })), 2000);
+                                              setReferralMsgCopied(prev => ({ ...prev, [key]: true }));
+                                              setTimeout(() => setReferralMsgCopied(prev => ({ ...prev, [key]: false })), 2000);
                                             }}
                                             style={{ background: isCopied ? "#0d2818" : "#141414", border: "1px solid #333333", color: isCopied ? "#4ade80" : "#888888", borderRadius: 6, padding: "4px 10px", fontSize: 10, cursor: "pointer" }}
                                           >
                                             {isCopied ? "✓ Copied!" : "📋 Copy"}
                                           </button>
                                           <button
-                                            onClick={() => handleDraftMessage(person)}
+                                            onClick={() => handleDraftReferralMessage(person, activeJdTab)}
                                             disabled={isLoading}
                                             style={{ background: "#141414", border: "1px solid #333333", color: "#888888", borderRadius: 6, padding: "4px 10px", fontSize: 10, cursor: "pointer" }}
                                           >
