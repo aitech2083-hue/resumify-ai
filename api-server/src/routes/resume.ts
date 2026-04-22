@@ -1482,15 +1482,18 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
       },
     );
 
+    const rawText = await response.text();
+    console.log('Apify raw response:', rawText.substring(0, 1000));
+    console.log('Apify status:', response.status);
+
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("Apify error:", response.status, errText);
+      console.error("Apify error:", response.status, rawText);
       res.status(502).json({ error: "Could not search for referrals right now" });
       return;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any[] = await response.json();
+    const data: any[] = JSON.parse(rawText);
 
     console.log('=== REFERRAL DEBUG ===');
     console.log('Company URL:', companyLinkedinUrl);
