@@ -1492,6 +1492,18 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any[] = await response.json();
 
+    console.log('=== REFERRAL DEBUG ===');
+    console.log('Company URL:', companyLinkedinUrl);
+    console.log('Apify status:', response.status);
+    console.log('Apify response type:', typeof data);
+    console.log('Is array:', Array.isArray(data));
+    console.log('Data length:', Array.isArray(data) ? data.length : 'N/A');
+    console.log('First item keys:', Array.isArray(data) && data[0] ? Object.keys(data[0]) : 'empty');
+    if (Array.isArray(data) && data[0]) {
+      console.log('First item sample:', JSON.stringify(data[0], null, 2).substring(0, 1000));
+    }
+    console.log('=== END DEBUG ===');
+
     if (!Array.isArray(data) || data.length === 0) {
       res.json({ success: true, people: [], totalFound: 0, message: "No referrals found for this company" });
       return;
