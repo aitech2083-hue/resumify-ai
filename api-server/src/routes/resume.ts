@@ -1468,7 +1468,7 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
       companies: [companyLinkedinUrl.trim()],
       yearsAtCurrentCompany: ["2", "3", "4", "5"],
       maxItems: 15,
-      profileScraperMode: "Full ($8 per 1k)",
+      profileScraperMode: "Full",
       companyBatchMode: "all_at_once",
       recentlyChangedJobs: false,
     };
