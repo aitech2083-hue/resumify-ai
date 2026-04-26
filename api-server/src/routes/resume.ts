@@ -1443,10 +1443,20 @@ function parseDurationToMonths(duration: string | null | undefined): number {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapCaprolokItems(data: any[], companyName: string): Record<string, unknown>[] {
   if (!Array.isArray(data)) return [];
+  const targetCompany = companyName.toLowerCase();
   return data
-    .filter((item: any) => !!item.link) // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((item: any) => {
+      if (!item.link) return false;
+      // Only keep people whose first experience entry matches the target company
+      const currentJob = Array.isArray(item.experience) ? item.experience[0] : null;
+      if (!currentJob) return false;
+      const jobCompany = (currentJob.company || currentJob.companyName || "").toLowerCase();
+      return jobCompany.includes(targetCompany) || targetCompany.includes(jobCompany);
+    })
     .slice(0, 10)
-    .map((item: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((item: any, idx: number) => ({
       id: idx + 1,
       name: item.name || "",
       title: item.designation || "",
@@ -1536,7 +1546,7 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
     const apifyInput = {
       companyUrls: [companyLinkedinUrl.trim()],
       designation: [jobTitle.trim()],
-      maxResultsPerCompany: 10,
+      maxResultsPerCompany: 50,
       country: "IN",
     };
 
