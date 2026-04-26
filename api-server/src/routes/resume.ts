@@ -1489,8 +1489,8 @@ function mapApifyItems(data: any[], companyName: string): Record<string, unknown
 }
 
 // POST /find-referrals — starts an async Apify run, returns runId immediately
-router.get("/find-referrals", async (req: Request, res: Response) => {
-  const { companyLinkedinUrl, companyName, jobTitle } = req.query as {
+router.post("/find-referrals", async (req: Request, res: Response) => {
+  const { companyLinkedinUrl, companyName, jobTitle } = req.body as {
     companyLinkedinUrl?: string;
     companyName?: string;
     jobTitle?: string;
