@@ -1448,11 +1448,9 @@ function mapCaprolokItems(data: any[], companyName: string): Record<string, unkn
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .filter((item: any) => {
       if (!item.link) return false;
-      // Only keep people whose first experience entry matches the target company
-      const currentJob = Array.isArray(item.experience) ? item.experience[0] : null;
-      if (!currentJob) return false;
-      const jobCompany = (currentJob.company || currentJob.companyName || "").toLowerCase();
-      return jobCompany.includes(targetCompany) || targetCompany.includes(jobCompany);
+      // experience is a plain string containing the current company name
+      const currentCompany = (item.experience || "").toLowerCase();
+      return currentCompany.includes(targetCompany);
     })
     .slice(0, 10)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1641,8 +1639,6 @@ router.get("/find-referrals/:runId", async (req: Request, res: Response) => {
       `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}&clean=true`,
     );
     const itemsText = await itemsRes.text();
-    console.log(`[poll-referrals] Dataset items status=${itemsRes.status} length=${itemsText.length}`);
-    console.log(`[poll-referrals] First 500 chars:`, itemsText.substring(0, 500));
 
     if (!itemsRes.ok) {
       res.status(502).json({ error: "Could not fetch referral results." });
@@ -1651,11 +1647,6 @@ router.get("/find-referrals/:runId", async (req: Request, res: Response) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawItems: any[] = JSON.parse(itemsText);
-    console.log(`[poll-referrals] Total items: ${Array.isArray(rawItems) ? rawItems.length : "not array"}`);
-    if (Array.isArray(rawItems) && rawItems[0]) {
-      console.log(`[poll-referrals] First item keys:`, Object.keys(rawItems[0]));
-      console.log(`[poll-referrals] First item sample:`, JSON.stringify(rawItems[0]).substring(0, 500));
-    }
 
     const people = mapCaprolokItems(rawItems, companyName);
     res.json({ status: "done", people, totalFound: people.length });
