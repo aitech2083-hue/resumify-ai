@@ -1439,6 +1439,56 @@ function parseDurationToMonths(duration: string | null | undefined): number {
   return years * 12 + months;
 }
 
+// ── Shared helper: map raw Apify items → ReferralPerson shape ────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapApifyItems(data: any[], companyName: string): Record<string, unknown>[] {
+  return data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((item: any) => {
+      if (!item.linkedinUrl) return false;
+      const duration = item.experience?.[0]?.duration;
+      const startYear = item.experience?.[0]?.startDate?.year;
+      let months = parseDurationToMonths(duration);
+      if (months === 0 && startYear) {
+        months = (new Date().getFullYear() - startYear) * 12;
+      }
+      return months >= 12;
+    })
+    .slice(0, 10)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((item: any, idx: number) => {
+      const duration = item.experience?.[0]?.duration;
+      const startYear = item.experience?.[0]?.startDate?.year;
+      let displayDuration: string | null = duration || null;
+      if (!displayDuration && startYear) {
+        const years = new Date().getFullYear() - startYear;
+        displayDuration = years === 1 ? "1 yr" : `${years} yrs`;
+      }
+      const topSkillsRaw: string = item.topSkills || "";
+      const skills = topSkillsRaw.split(" • ").map((s: string) => s.trim()).filter(Boolean).slice(0, 3);
+      const title =
+        item.experience?.[0]?.position ||
+        item.headline?.split("/")?.[0]?.trim() ||
+        item.headline?.split("|")?.[0]?.trim() ||
+        item.headline || "";
+
+      return {
+        id: idx + 1,
+        name: ((item.firstName || "") + " " + (item.lastName || "")).trim(),
+        title,
+        company: item.experience?.[0]?.companyName || companyName,
+        duration: displayDuration,
+        city: item.location?.parsed?.city || "",
+        country: item.location?.parsed?.country || "",
+        photo: item.photo || null,
+        linkedinUrl: item.linkedinUrl,
+        skills,
+        email: null,
+      };
+    });
+}
+
+// POST /find-referrals — starts an async Apify run, returns runId immediately
 router.post("/find-referrals", async (req: Request, res: Response) => {
   const { companyLinkedinUrl, companyName, jobTitle } = req.body as {
     companyLinkedinUrl?: string;
@@ -1463,8 +1513,7 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apifyInput: any = {
+    const apifyInput = {
       companies: [companyLinkedinUrl.trim()],
       yearsAtCurrentCompanyIds: [2, 3, 4, 5],
       maxItems: 15,
@@ -1472,8 +1521,10 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
       companyBatchMode: "All at once",
     };
 
-    const response = await fetch(
-      `https://api.apify.com/v2/acts/harvestapi~linkedin-company-employees/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=90`,
+    console.log("[find-referrals] Starting Apify run, input:", JSON.stringify(apifyInput));
+
+    const runRes = await fetch(
+      `https://api.apify.com/v2/acts/harvestapi~linkedin-company-employees/runs?token=${APIFY_TOKEN}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1481,104 +1532,106 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
       },
     );
 
-    const rawText = await response.text();
-    console.log('Apify raw response:', rawText.substring(0, 1000));
-    console.log('Apify status:', response.status);
+    const runText = await runRes.text();
+    console.log("[find-referrals] Run start status:", runRes.status, runText.substring(0, 500));
 
-    if (!response.ok) {
-      console.error("Apify error:", response.status, rawText);
-      res.status(502).json({ error: "Could not search for referrals right now" });
+    if (!runRes.ok) {
+      res.status(502).json({ error: "Could not start referral search. Please try again." });
+      return;
+    }
+
+    const runData = JSON.parse(runText) as { data?: { id?: string } };
+    const runId = runData?.data?.id;
+
+    if (!runId) {
+      console.error("[find-referrals] No runId in response:", runText);
+      res.status(502).json({ error: "Could not start referral search. Please try again." });
+      return;
+    }
+
+    console.log("[find-referrals] Run started, runId:", runId);
+    res.json({ status: "processing", runId, companyName });
+  } catch (error: unknown) {
+    console.error("[find-referrals] Error:", error instanceof Error ? error.message : String(error));
+    res.status(500).json({ error: "Could not start referral search. Please try again." });
+  }
+});
+
+// GET /find-referrals/:runId — poll status and return results when ready
+router.get("/find-referrals/:runId", async (req: Request, res: Response) => {
+  const { runId } = req.params;
+  const companyName = (req.query.companyName as string) || "";
+
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  if (!APIFY_TOKEN) {
+    res.status(500).json({ error: "Service configuration error" });
+    return;
+  }
+
+  try {
+    const statusRes = await fetch(
+      `https://api.apify.com/v2/acts/harvestapi~linkedin-company-employees/runs/${runId}?token=${APIFY_TOKEN}`,
+    );
+
+    const statusText = await statusRes.text();
+    console.log(`[poll-referrals] runId=${runId} status=${statusRes.status} body=${statusText.substring(0, 300)}`);
+
+    if (!statusRes.ok) {
+      res.status(502).json({ error: "Could not check referral search status." });
+      return;
+    }
+
+    const statusData = JSON.parse(statusText) as {
+      data?: { status?: string; defaultDatasetId?: string; finishedAt?: string; startedAt?: string };
+    };
+    const runStatus = statusData?.data?.status;
+    const datasetId = statusData?.data?.defaultDatasetId;
+    const startedAt = statusData?.data?.startedAt;
+
+    // Timeout guard: fail gracefully after 5 minutes
+    if (startedAt) {
+      const elapsed = Date.now() - new Date(startedAt).getTime();
+      if (elapsed > 5 * 60 * 1000 && runStatus !== "SUCCEEDED") {
+        res.json({ status: "timeout", people: [] });
+        return;
+      }
+    }
+
+    if (runStatus === "FAILED" || runStatus === "ABORTED" || runStatus === "TIMED-OUT") {
+      res.json({ status: "failed", people: [] });
+      return;
+    }
+
+    if (runStatus !== "SUCCEEDED") {
+      res.json({ status: "processing", runStatus });
+      return;
+    }
+
+    // Run succeeded — fetch dataset items
+    const itemsRes = await fetch(
+      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}&clean=true`,
+    );
+    const itemsText = await itemsRes.text();
+    console.log(`[poll-referrals] Dataset items status=${itemsRes.status} length=${itemsText.length}`);
+    console.log(`[poll-referrals] First 500 chars:`, itemsText.substring(0, 500));
+
+    if (!itemsRes.ok) {
+      res.status(502).json({ error: "Could not fetch referral results." });
       return;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any[] = JSON.parse(rawText);
-
-    console.log('=== REFERRAL DEBUG ===');
-    console.log('Company URL:', companyLinkedinUrl);
-    console.log('Apify status:', response.status);
-    console.log('Apify response type:', typeof data);
-    console.log('Is array:', Array.isArray(data));
-    console.log('Data length:', Array.isArray(data) ? data.length : 'N/A');
-    console.log('First item keys:', Array.isArray(data) && data[0] ? Object.keys(data[0]) : 'empty');
-    if (Array.isArray(data) && data[0]) {
-      console.log('First item sample:', JSON.stringify(data[0], null, 2).substring(0, 1000));
-    }
-    console.log('=== END DEBUG ===');
-
-    if (!Array.isArray(data) || data.length === 0) {
-      res.json({ success: true, people: [], totalFound: 0, message: "No referrals found for this company" });
-      return;
+    const rawItems: any[] = JSON.parse(itemsText);
+    console.log(`[poll-referrals] Total items: ${Array.isArray(rawItems) ? rawItems.length : "not array"}`);
+    if (Array.isArray(rawItems) && rawItems[0]) {
+      console.log(`[poll-referrals] First item keys:`, Object.keys(rawItems[0]));
     }
 
-    const people = data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((item: any) => {
-        if (!item.linkedinUrl) return false;
-        const duration = item.experience?.[0]?.duration;
-        const startYear = item.experience?.[0]?.startDate?.year;
-        let months = parseDurationToMonths(duration);
-        if (months === 0 && startYear) {
-          months = (new Date().getFullYear() - startYear) * 12;
-        }
-        if (months < 12) return false;
-        return true;
-      })
-      .slice(0, 10)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((item: any, idx: number) => {
-        const duration = item.experience?.[0]?.duration;
-        const startYear = item.experience?.[0]?.startDate?.year;
-        let displayDuration: string | null = duration || null;
-        if (!displayDuration && startYear) {
-          const years = new Date().getFullYear() - startYear;
-          displayDuration = years === 1 ? "1 yr" : `${years} yrs`;
-        }
-
-        const topSkillsRaw: string = item.topSkills || "";
-        const skills = topSkillsRaw
-          .split(" • ")
-          .map((s: string) => s.trim())
-          .filter(Boolean)
-          .slice(0, 3);
-
-        const title =
-          item.experience?.[0]?.position ||
-          item.headline?.split("/")?.[0]?.trim() ||
-          item.headline?.split("|")?.[0]?.trim() ||
-          item.headline ||
-          "";
-
-        return {
-          id: idx + 1,
-          name: ((item.firstName || "") + " " + (item.lastName || "")).trim(),
-          title,
-          company: item.experience?.[0]?.companyName || companyName,
-          duration: displayDuration,
-          city: item.location?.parsed?.city || "",
-          country: item.location?.parsed?.country || "",
-          photo: item.photo || null,
-          linkedinUrl: item.linkedinUrl,
-          skills,
-          email: null,
-        };
-      });
-
-    res.json({
-      success: true,
-      company: companyName,
-      role: jobTitle,
-      people,
-      totalFound: people.length,
-    });
+    const people = mapApifyItems(rawItems, companyName);
+    res.json({ status: "done", people, totalFound: people.length });
   } catch (error: unknown) {
-    console.error(
-      "Find referrals error:",
-      error instanceof Error ? error.message : String(error),
-    );
-    res
-      .status(500)
-      .json({ error: "Could not find referrals. Please try again." });
+    console.error("[poll-referrals] Error:", error instanceof Error ? error.message : String(error));
+    res.status(500).json({ error: "Could not fetch referral results. Please try again." });
   }
 });
 
