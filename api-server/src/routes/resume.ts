@@ -1439,56 +1439,76 @@ function parseDurationToMonths(duration: string | null | undefined): number {
   return years * 12 + months;
 }
 
-// ── Shared helper: map raw Apify items → ReferralPerson shape ────────────────
+// ── caprolok mapper: map caprolok~linkedin-employees-scraper items → ReferralPerson ──
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapApifyItems(data: any[], companyName: string): Record<string, unknown>[] {
+function mapCaprolokItems(data: any[], companyName: string): Record<string, unknown>[] {
+  if (!Array.isArray(data)) return [];
   return data
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((item: any) => {
-      if (!item.linkedinUrl) return false;
-      const duration = item.experience?.[0]?.duration;
-      const startYear = item.experience?.[0]?.startDate?.year;
-      let months = parseDurationToMonths(duration);
-      if (months === 0 && startYear) {
-        months = (new Date().getFullYear() - startYear) * 12;
-      }
-      return months >= 12;
-    })
+    .filter((item: any) => !!item.link) // eslint-disable-line @typescript-eslint/no-explicit-any
     .slice(0, 10)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((item: any, idx: number) => {
-      const duration = item.experience?.[0]?.duration;
-      const startYear = item.experience?.[0]?.startDate?.year;
-      let displayDuration: string | null = duration || null;
-      if (!displayDuration && startYear) {
-        const years = new Date().getFullYear() - startYear;
-        displayDuration = years === 1 ? "1 yr" : `${years} yrs`;
-      }
-      const topSkillsRaw: string = item.topSkills || "";
-      const skills = topSkillsRaw.split(" • ").map((s: string) => s.trim()).filter(Boolean).slice(0, 3);
-      const title =
-        item.experience?.[0]?.position ||
-        item.headline?.split("/")?.[0]?.trim() ||
-        item.headline?.split("|")?.[0]?.trim() ||
-        item.headline || "";
-
-      return {
-        id: idx + 1,
-        name: ((item.firstName || "") + " " + (item.lastName || "")).trim(),
-        title,
-        company: item.experience?.[0]?.companyName || companyName,
-        duration: displayDuration,
-        city: item.location?.parsed?.city || "",
-        country: item.location?.parsed?.country || "",
-        photo: item.photo || null,
-        linkedinUrl: item.linkedinUrl,
-        skills,
-        email: null,
-      };
-    });
+    .map((item: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+      id: idx + 1,
+      name: item.name || "",
+      title: item.designation || "",
+      company: companyName,
+      duration: null,
+      city: item.location || "",
+      country: "",
+      photo: item.thumbnail || null,
+      linkedinUrl: item.link || "",
+      skills: [],
+      email: null,
+    }));
 }
 
-// POST /find-referrals — starts an async Apify run, returns runId immediately
+// HARVESTAPI BACKUP - uncomment when Apify upgraded to Starter plan
+// // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// function mapApifyItems(data: any[], companyName: string): Record<string, unknown>[] {
+//   return data
+//     .filter((item: any) => {
+//       if (!item.linkedinUrl) return false;
+//       const duration = item.experience?.[0]?.duration;
+//       const startYear = item.experience?.[0]?.startDate?.year;
+//       let months = parseDurationToMonths(duration);
+//       if (months === 0 && startYear) months = (new Date().getFullYear() - startYear) * 12;
+//       return months >= 12;
+//     })
+//     .slice(0, 10)
+//     .map((item: any, idx: number) => {
+//       const duration = item.experience?.[0]?.duration;
+//       const startYear = item.experience?.[0]?.startDate?.year;
+//       let displayDuration: string | null = duration || null;
+//       if (!displayDuration && startYear) {
+//         const years = new Date().getFullYear() - startYear;
+//         displayDuration = years === 1 ? "1 yr" : `${years} yrs`;
+//       }
+//       const topSkillsRaw: string = item.topSkills || "";
+//       const skills = topSkillsRaw.split(" • ").map((s: string) => s.trim()).filter(Boolean).slice(0, 3);
+//       const title = item.experience?.[0]?.position || item.headline?.split("/")?.[0]?.trim() || item.headline || "";
+//       return {
+//         id: idx + 1,
+//         name: ((item.firstName || "") + " " + (item.lastName || "")).trim(),
+//         title, company: item.experience?.[0]?.companyName || companyName,
+//         duration: displayDuration, city: item.location?.parsed?.city || "",
+//         country: item.location?.parsed?.country || "", photo: item.photo || null,
+//         linkedinUrl: item.linkedinUrl, skills, email: null,
+//       };
+//     });
+// }
+//
+// // HARVESTAPI input (Starter plan required):
+// // const apifyInput = {
+// //   companies: [companyLinkedinUrl.trim()],
+// //   yearsAtCurrentCompanyIds: ["2", "3", "4", "5"],
+// //   yearsOfExperienceIds: ["2", "3", "4"],
+// //   maxItems: 15,
+// //   profileScraperMode: "Full ($8 per 1k)",
+// //   companyBatchMode: "all_at_once",
+// //   recentlyChangedJobs: false,
+// // };
+// // actor: harvestapi~linkedin-company-employees
+
+// POST /find-referrals — starts async caprolok run, returns runId immediately
 router.post("/find-referrals", async (req: Request, res: Response) => {
   const { companyLinkedinUrl, companyName, jobTitle } = req.body as {
     companyLinkedinUrl?: string;
@@ -1514,19 +1534,16 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
 
   try {
     const apifyInput = {
-      companies: [companyLinkedinUrl.trim()],
-      yearsAtCurrentCompanyIds: ["2", "3", "4", "5"],
-      yearsOfExperienceIds: ["2", "3", "4"],
-      maxItems: 15,
-      profileScraperMode: "Full ($8 per 1k)",
-      companyBatchMode: "all_at_once",
-      recentlyChangedJobs: false,
+      companyUrls: [companyLinkedinUrl.trim()],
+      designation: [jobTitle.trim()],
+      maxResultsPerCompany: 10,
+      country: "IN",
     };
 
-    console.log("[find-referrals] Starting Apify run, input:", JSON.stringify(apifyInput));
+    console.log("[find-referrals] Starting caprolok run, input:", JSON.stringify(apifyInput));
 
     const runRes = await fetch(
-      `https://api.apify.com/v2/acts/harvestapi~linkedin-company-employees/runs?token=${APIFY_TOKEN}`,
+      `https://api.apify.com/v2/acts/caprolok~linkedin-employees-scraper/runs?token=${APIFY_TOKEN}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1559,7 +1576,7 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
   }
 });
 
-// GET /find-referrals/:runId — poll status and return results when ready
+// GET /find-referrals/:runId — poll caprolok run status and return results when ready
 router.get("/find-referrals/:runId", async (req: Request, res: Response) => {
   const { runId } = req.params;
   const companyName = (req.query.companyName as string) || "";
@@ -1572,7 +1589,7 @@ router.get("/find-referrals/:runId", async (req: Request, res: Response) => {
 
   try {
     const statusRes = await fetch(
-      `https://api.apify.com/v2/acts/harvestapi~linkedin-company-employees/runs/${runId}?token=${APIFY_TOKEN}`,
+      `https://api.apify.com/v2/acts/caprolok~linkedin-employees-scraper/runs/${runId}?token=${APIFY_TOKEN}`,
     );
 
     const statusText = await statusRes.text();
@@ -1584,7 +1601,7 @@ router.get("/find-referrals/:runId", async (req: Request, res: Response) => {
     }
 
     const statusData = JSON.parse(statusText) as {
-      data?: { status?: string; defaultDatasetId?: string; finishedAt?: string; startedAt?: string };
+      data?: { status?: string; defaultDatasetId?: string; startedAt?: string };
     };
     const runStatus = statusData?.data?.status;
     const datasetId = statusData?.data?.defaultDatasetId;
@@ -1627,9 +1644,10 @@ router.get("/find-referrals/:runId", async (req: Request, res: Response) => {
     console.log(`[poll-referrals] Total items: ${Array.isArray(rawItems) ? rawItems.length : "not array"}`);
     if (Array.isArray(rawItems) && rawItems[0]) {
       console.log(`[poll-referrals] First item keys:`, Object.keys(rawItems[0]));
+      console.log(`[poll-referrals] First item sample:`, JSON.stringify(rawItems[0]).substring(0, 500));
     }
 
-    const people = mapApifyItems(rawItems, companyName);
+    const people = mapCaprolokItems(rawItems, companyName);
     res.json({ status: "done", people, totalFound: people.length });
   } catch (error: unknown) {
     console.error("[poll-referrals] Error:", error instanceof Error ? error.message : String(error));
