@@ -524,7 +524,6 @@ export default function Home() {
     const role = r.jobTitle || jds[tabIdx]?.title || "";
     if (!company || !role) return;
 
-    // If no LinkedIn URL, set no_url error immediately without hitting the API
     if (!companyLinkedinUrl.trim()) {
       setReferralData(prev => ({
         ...prev,
@@ -540,27 +539,86 @@ export default function Home() {
 
     try {
       const baseUrl = import.meta.env.BASE_URL || "/";
-      const res = await fetch(`${baseUrl}api/resume/find-referrals`, {
+
+      // Step 1: start the async Apify run
+      const startRes = await fetch(`${baseUrl}api/resume/find-referrals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companyLinkedinUrl: companyLinkedinUrl.trim(), companyName: company, jobTitle: role }),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const startData = await startRes.json();
+
+      if (!startRes.ok) {
         setReferralData(prev => ({
           ...prev,
-          [tabIdx]: { people: [], loading: false, error: data.error || "Search failed", searched: true },
+          [tabIdx]: { people: [], loading: false, error: startData.error || "Search failed", searched: true },
         }));
         return;
       }
-      setReferralData(prev => ({
-        ...prev,
-        [tabIdx]: { people: data.people || [], loading: false, error: null, searched: true },
-      }));
+
+      const { runId } = startData as { runId: string };
+
+      // Step 2: poll GET /find-referrals/:runId every 5 seconds, timeout after 5 min
+      const POLL_INTERVAL = 5000;
+      const MAX_POLLS = 60; // 5 min
+      let polls = 0;
+
+      const poll = async () => {
+        if (polls >= MAX_POLLS) {
+          setReferralData(prev => ({
+            ...prev,
+            [tabIdx]: { people: [], loading: false, error: "Search timed out. Please try again.", searched: true },
+          }));
+          return;
+        }
+        polls++;
+
+        try {
+          const pollRes = await fetch(
+            `${baseUrl}api/resume/find-referrals/${runId}?companyName=${encodeURIComponent(company)}`,
+          );
+          const pollData = await pollRes.json();
+
+          if (!pollRes.ok) {
+            setReferralData(prev => ({
+              ...prev,
+              [tabIdx]: { people: [], loading: false, error: pollData.error || "Search failed", searched: true },
+            }));
+            return;
+          }
+
+          if (pollData.status === "processing") {
+            setTimeout(poll, POLL_INTERVAL);
+            return;
+          }
+
+          if (pollData.status === "failed" || pollData.status === "timeout") {
+            setReferralData(prev => ({
+              ...prev,
+              [tabIdx]: { people: [], loading: false, error: "Search failed. Please try again.", searched: true },
+            }));
+            return;
+          }
+
+          // status === "done"
+          setReferralData(prev => ({
+            ...prev,
+            [tabIdx]: { people: pollData.people || [], loading: false, error: null, searched: true },
+          }));
+        } catch {
+          setReferralData(prev => ({
+            ...prev,
+            [tabIdx]: { people: [], loading: false, error: "Could not fetch results. Try again.", searched: true },
+          }));
+        }
+      };
+
+      // Start polling after initial delay
+      setTimeout(poll, POLL_INTERVAL);
     } catch {
       setReferralData(prev => ({
         ...prev,
-        [tabIdx]: { people: [], loading: false, error: "Could not find referrals. Try again.", searched: true },
+        [tabIdx]: { people: [], loading: false, error: "Could not start referral search. Try again.", searched: true },
       }));
     }
   };
