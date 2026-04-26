@@ -1516,9 +1516,11 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
     const apifyInput = {
       companies: [companyLinkedinUrl.trim()],
       yearsAtCurrentCompanyIds: ["2", "3", "4", "5"],
+      yearsOfExperienceIds: ["2", "3", "4"],
       maxItems: 15,
       profileScraperMode: "Full ($8 per 1k)",
-      companyBatchMode: "All at once",
+      companyBatchMode: "all_at_once",
+      recentlyChangedJobs: false,
     };
 
     console.log("[find-referrals] Starting Apify run, input:", JSON.stringify(apifyInput));
