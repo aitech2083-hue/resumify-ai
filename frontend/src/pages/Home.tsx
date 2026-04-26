@@ -541,11 +541,12 @@ export default function Home() {
       const baseUrl = import.meta.env.BASE_URL || "/";
 
       // Step 1: start the async Apify run
-      const startRes = await fetch(`${baseUrl}api/resume/find-referrals`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyLinkedinUrl: companyLinkedinUrl.trim(), companyName: company, jobTitle: role }),
+      const startParams = new URLSearchParams({
+        companyLinkedinUrl: companyLinkedinUrl.trim(),
+        companyName: company,
+        jobTitle: role,
       });
+      const startRes = await fetch(`${baseUrl}api/resume/find-referrals?${startParams}`);
       const startData = await startRes.json();
 
       if (!startRes.ok) {
