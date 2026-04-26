@@ -1515,7 +1515,7 @@ router.post("/find-referrals", async (req: Request, res: Response) => {
   try {
     const apifyInput = {
       companies: [companyLinkedinUrl.trim()],
-      yearsAtCurrentCompanyIds: [2, 3, 4, 5],
+      yearsAtCurrentCompanyIds: ["2", "3", "4", "5"],
       maxItems: 15,
       profileScraperMode: "Full ($8 per 1k)",
       companyBatchMode: "All at once",
